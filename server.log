@@ -6,4 +6,4 @@
 - Local:         http://localhost:3000
 - Network:       http://192.168.0.2:3000
 ✓ Ready in 188ms
-✓ Running next.config.ts took 39ms
+✓ Running next.config.ts took 37ms
