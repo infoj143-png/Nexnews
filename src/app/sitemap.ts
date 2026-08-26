@@ -1,6 +1,9 @@
 import { MetadataRoute } from 'next';
 import { getArticles, CATEGORIES } from '@/lib/data';
 
+/**
+ * Dynamic sitemap generator using the exact live Vercel domain base URL.
+ */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://nexnews-nu.vercel.app';
 

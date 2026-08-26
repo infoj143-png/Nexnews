@@ -132,7 +132,7 @@ export async function fetchTrendingNewsItem(): Promise<TrendingNewsItem> {
   const selectedFallback = FALLBACK_TOPICS[Math.floor(Math.random() * FALLBACK_TOPICS.length)];
   return {
     title: selectedFallback.title,
-    link: 'https://nexnews.ai',
+    link: 'https://nexnews-nu.vercel.app',
     description: selectedFallback.description,
     pubDate: new Date().toISOString(),
     source: selectedFallback.source,
