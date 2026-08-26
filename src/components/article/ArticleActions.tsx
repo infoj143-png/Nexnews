@@ -25,7 +25,7 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ title, slug }) =
   const [commentText, setCommentText] = useState('');
   const [authorName, setAuthorName] = useState('');
 
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://nexnews.ai/news/${slug}`;
+  const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://nexnews-nu.vercel.app/news/${slug}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(shareUrl);

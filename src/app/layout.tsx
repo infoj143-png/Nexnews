@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://nexnews.ai",
+    url: "https://nexnews-nu.vercel.app",
     siteName: "Nexnews",
     title: "Nexnews - AI-Powered Automated News Portal",
     description: "Real-time AI automated news covering breaking stories globally."
