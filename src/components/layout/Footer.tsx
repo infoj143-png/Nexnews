@@ -49,12 +49,6 @@ export const Footer: React.FC = () => {
             <h4 className="text-white font-bold text-sm tracking-wider uppercase mb-4">Platform</h4>
             <ul className="space-y-2 text-sm text-slate-400">
               <li>
-                <Link href="/admin" className="hover:text-blue-400 transition-colors flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5 text-blue-500" />
-                  <span>Admin Portal</span>
-                </Link>
-              </li>
-              <li>
                 <span className="hover:text-slate-300 transition-colors flex items-center gap-1.5">
                   <Rss className="w-3.5 h-3.5 text-amber-500" />
                   <span>Automated RSS Sync</span>
