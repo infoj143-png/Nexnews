@@ -36,9 +36,9 @@ export default function RootLayout({
         {/* Breaking News Ticker */}
         <BreakingTicker />
 
-        {/* Global Header Ad Banner Slot */}
+        {/* Global Leaderboard Ad Banner Slot (728x90 Container) */}
         <div className="max-w-7xl mx-auto px-4 w-full">
-          <AdBanner slot="header" provider="adsterra" />
+          <AdBanner slot="header" provider="adsterra" adType="adsterra-container" />
         </div>
 
         {/* Main Content Area */}
@@ -47,7 +47,7 @@ export default function RootLayout({
         </main>
 
         {/* Sticky Mobile / Bottom Banner */}
-        <AdBanner slot="footer-sticky" provider="monetag" className="hidden sm:flex" />
+        <AdBanner slot="footer-sticky" provider="adsterra" adType="adsterra-atoptions" className="hidden sm:flex" />
 
         {/* Global Footer */}
         <Footer />
