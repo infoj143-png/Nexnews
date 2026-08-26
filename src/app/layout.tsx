@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 import { Header } from "@/components/layout/Header";
 import { BreakingTicker } from "@/components/layout/BreakingTicker";
@@ -30,6 +31,14 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full">
       <body className="min-h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
+        {/* Monetag Global Tag Script */}
+        <Script
+          id="monetag-tag"
+          src="https://nap5k.com/tag.min.js"
+          data-zone="11660788"
+          strategy="afterInteractive"
+        />
+
         {/* Global Header */}
         <Header />
 
