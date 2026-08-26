@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next';
 import { getArticles, CATEGORIES } from '@/lib/data';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://nexnews.ai';
+  const baseUrl = 'https://nexnews-nu.vercel.app';
 
   // Homepage
   const routes: MetadataRoute.Sitemap = [
