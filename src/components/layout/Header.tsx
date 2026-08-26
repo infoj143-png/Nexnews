@@ -56,10 +56,7 @@ export const Header: React.FC = () => {
             </span>
           </div>
           <div className="flex items-center gap-4 text-xs">
-            <Link href="/admin" className="flex items-center gap-1 font-semibold text-blue-400 hover:text-blue-300 transition-colors">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Admin Portal</span>
-            </Link>
+            <span className="text-slate-400 font-medium">Verified Stream</span>
           </div>
         </div>
       </div>
@@ -204,16 +201,6 @@ export const Header: React.FC = () => {
                 {cat}
               </Link>
             ))}
-            <div className="pt-3 border-t border-slate-200 dark:border-slate-800">
-              <Link
-                href="/admin"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center gap-2 px-3 py-2 text-blue-600 dark:text-blue-400 font-bold"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Admin Dashboard</span>
-              </Link>
-            </div>
           </div>
         </div>
       )}

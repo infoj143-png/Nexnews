@@ -26,12 +26,11 @@ export interface Article {
 }
 
 export interface AnalyticsData {
-  totalViews: number;
   totalArticles: number;
   publishedCount: number;
   draftCount: number;
-  estimatedRevenue: number;
-  viewsByDay: { date: string; views: number }[];
+  aiGeneratedCount: number;
+  manualCount: number;
   categoryDistribution: { category: Category; count: number }[];
 }
 
@@ -71,7 +70,7 @@ let initialArticles: Article[] = [
     isFeatured: true,
     isTrending: true,
     isBreaking: true,
-    views: 45200,
+    views: 0,
     status: 'published',
     tags: ['AI', 'OpenAI', 'GPT-5', 'Tech News', 'Machine Learning'],
     aiGenerated: true
@@ -102,7 +101,7 @@ let initialArticles: Article[] = [
     isFeatured: true,
     isTrending: true,
     isBreaking: false,
-    views: 28400,
+    views: 0,
     status: 'published',
     tags: ['Economy', 'Markets', 'Finance', 'Interest Rates', 'Business'],
     aiGenerated: false
@@ -130,7 +129,7 @@ let initialArticles: Article[] = [
     isFeatured: true,
     isTrending: true,
     isBreaking: false,
-    views: 31900,
+    views: 0,
     status: 'published',
     tags: ['EV', 'Batteries', 'Tech', 'Innovation', 'Automotive'],
     aiGenerated: false
@@ -158,7 +157,7 @@ let initialArticles: Article[] = [
     isFeatured: false,
     isTrending: true,
     isBreaking: false,
-    views: 19800,
+    views: 0,
     status: 'published',
     tags: ['Space', 'World', 'Science', 'Diplomacy'],
     aiGenerated: false
@@ -186,7 +185,7 @@ let initialArticles: Article[] = [
     isFeatured: false,
     isTrending: false,
     isBreaking: false,
-    views: 14200,
+    views: 0,
     status: 'published',
     tags: ['Football', 'Sports', 'ChampionsLeague', 'Soccer'],
     aiGenerated: false
@@ -214,7 +213,7 @@ let initialArticles: Article[] = [
     isFeatured: false,
     isTrending: true,
     isBreaking: false,
-    views: 22100,
+    views: 0,
     status: 'published',
     tags: ['AI', 'Software', 'DevOps', 'Testing'],
     aiGenerated: true
@@ -274,33 +273,23 @@ export function slugify(text: string): string {
 }
 
 export function getAnalytics(): AnalyticsData {
-  const totalViews = initialArticles.reduce((acc, item) => acc + item.views, 0);
+  const totalArticles = initialArticles.length;
   const publishedCount = initialArticles.filter(a => a.status === 'published').length;
   const draftCount = initialArticles.filter(a => a.status === 'draft').length;
-  const estimatedRevenue = Number((totalViews * 0.0035 + publishedCount * 12.5).toFixed(2));
+  const aiGeneratedCount = initialArticles.filter(a => a.aiGenerated).length;
+  const manualCount = initialArticles.filter(a => !a.aiGenerated).length;
 
   const categoryDistribution = CATEGORIES.map(cat => ({
     category: cat,
     count: initialArticles.filter(a => a.category === cat).length
   }));
 
-  const viewsByDay = [
-    { date: 'Mon', views: 12400 },
-    { date: 'Tue', views: 15800 },
-    { date: 'Wed', views: 22100 },
-    { date: 'Thu', views: 18900 },
-    { date: 'Fri', views: 25400 },
-    { date: 'Sat', views: 28900 },
-    { date: 'Sun', views: 31200 },
-  ];
-
   return {
-    totalViews,
-    totalArticles: initialArticles.length,
+    totalArticles,
     publishedCount,
     draftCount,
-    estimatedRevenue,
-    viewsByDay,
+    aiGeneratedCount,
+    manualCount,
     categoryDistribution
   };
 }
