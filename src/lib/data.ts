@@ -34,6 +34,14 @@ export interface AnalyticsData {
   categoryDistribution: { category: Category; count: number }[];
 }
 
+export interface CronLog {
+  id: string;
+  timestamp: string;
+  status: 'success' | 'error' | 'unauthorized';
+  message: string;
+  details?: Record<string, any>;
+}
+
 export const CATEGORIES: Category[] = ['Tech', 'World', 'Business', 'AI', 'Sports'];
 
 let initialArticles: Article[] = [
@@ -292,4 +300,41 @@ export function getAnalytics(): AnalyticsData {
     manualCount,
     categoryDistribution
   };
+}
+
+let initialCronLogs: CronLog[] = [
+  {
+    id: 'log-initial-1',
+    timestamp: new Date(Date.now() - 3600000 * 2).toISOString(),
+    status: 'success',
+    message: 'Autonomous news article generated and auto-published live successfully.',
+    details: {
+      source: {
+        title: 'OpenAI Unveils GPT-5',
+        sourceName: 'TechCrunch RSS',
+        link: 'https://techcrunch.com/sample'
+      },
+      articleId: '1',
+      articleTitle: 'OpenAI Unveils GPT-5: A Quantum Leap in Autonomous Reasoning and Multimodal Intelligence'
+    }
+  }
+];
+
+export function getCronLogs(): CronLog[] {
+  return initialCronLogs;
+}
+
+export function addCronLog(log: Omit<CronLog, 'id' | 'timestamp'> & { timestamp?: string }): CronLog {
+  const newLog: CronLog = {
+    ...log,
+    id: `cron-log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    timestamp: log.timestamp || new Date().toISOString()
+  };
+  initialCronLogs = [newLog, ...initialCronLogs];
+  return newLog;
+}
+
+export function clearCronLogs(): boolean {
+  initialCronLogs = [];
+  return true;
 }
