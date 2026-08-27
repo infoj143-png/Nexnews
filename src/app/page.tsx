@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { CATEGORIES, Category, getArticles, Article } from '@/lib/data';
@@ -10,7 +10,19 @@ import { NewsletterWidget } from '@/components/widgets/NewsletterWidget';
 import { Clock, Eye, Sparkles, ChevronRight, Zap, Filter } from 'lucide-react';
 
 export default function HomePage() {
-  const articles = getArticles();
+  const [articles, setArticles] = useState<Article[]>(() => getArticles());
+
+  useEffect(() => {
+    fetch('/api/articles')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.articles)) {
+          setArticles(data.articles);
+        }
+      })
+      .catch(err => console.error('Error fetching articles:', err));
+  }, []);
+
   const featuredArticles = articles.filter(a => a.isFeatured).slice(0, 3);
   const heroArticle = featuredArticles[0] || articles[0];
   const subFeatured = featuredArticles.slice(1);
