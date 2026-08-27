@@ -36,11 +36,6 @@ export const TrendingSidebar: React.FC = () => {
                 <span className="text-[10px] font-bold uppercase text-blue-600 dark:text-blue-400">
                   {item.category}
                 </span>
-                {item.aiGenerated && (
-                  <span className="text-[9px] font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/80 px-1.5 py-0.2 rounded flex items-center gap-0.5">
-                    <Sparkles className="w-2.5 h-2.5" /> AI
-                  </span>
-                )}
               </div>
               <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 leading-snug transition-colors line-clamp-2">
                 {item.title}

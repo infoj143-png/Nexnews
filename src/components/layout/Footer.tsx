@@ -19,12 +19,8 @@ export const Footer: React.FC = () => {
               </span>
             </Link>
             <p className="text-sm text-slate-400 leading-relaxed">
-              Automated real-time AI news synthesis platform delivering breaking developments across technology, business, world affairs, and sports.
+              Real-time news synthesis platform delivering breaking developments across technology, business, world affairs, and sports.
             </p>
-            <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 bg-slate-800/80 px-3 py-1.5 rounded-full w-fit border border-slate-700">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>AI Engine Active v2.5</span>
-            </div>
           </div>
 
           {/* Quick Category Links */}
@@ -78,7 +74,7 @@ export const Footer: React.FC = () => {
 
         {/* Bottom Bar */}
         <div className="mt-12 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
-          <p>© {new Date().getFullYear()} Nexnews Inc. Powered by Next.js & AI Content Automation.</p>
+          <p>© {new Date().getFullYear()} Nexnews Inc. Powered by Next.js & Nexnews Engine.</p>
           <div className="flex gap-6">
             <span className="hover:text-slate-400 cursor-pointer">Privacy Policy</span>
             <span className="hover:text-slate-400 cursor-pointer">Terms of Service</span>

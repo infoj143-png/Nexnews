@@ -48,7 +48,7 @@ export const Header: React.FC = () => {
           <div className="flex items-center gap-3 font-mono text-[11px]">
             <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              AI AUTOMATED AGENT ONLINE
+              LIVE NEWS FEED ONLINE
             </span>
             <span className="hidden sm:inline text-slate-600">|</span>
             <span className="hidden sm:inline text-slate-400">
@@ -74,7 +74,7 @@ export const Header: React.FC = () => {
                 Nex<span className="text-blue-600 dark:text-blue-500">news</span>
               </span>
               <span className="text-[10px] font-sans font-semibold text-slate-400 dark:text-slate-500 tracking-wider uppercase mt-0.5">
-                AI Autonomous Feed
+                Real-Time News Feed
               </span>
             </div>
           </Link>

@@ -44,7 +44,6 @@ export default function HomePage() {
               Featured Coverage
             </h2>
           </div>
-          <span className="text-xs text-slate-400 font-medium">Curated by AI Neural Engine</span>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -112,11 +111,6 @@ export default function HomePage() {
                     <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400">
                       {item.category}
                     </span>
-                    {item.aiGenerated && (
-                      <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold flex items-center gap-0.5">
-                        <Sparkles className="w-3 h-3" /> AI Generated
-                      </span>
-                    )}
                   </div>
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 line-clamp-2 leading-snug">
                     {item.title}

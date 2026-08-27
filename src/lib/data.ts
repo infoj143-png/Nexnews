@@ -303,9 +303,36 @@ export function updateArticle(id: string, updates: Partial<Article>): Article | 
 }
 
 export function deleteArticle(id: string): boolean {
+  let deleted = false;
   const initialLen = initialArticles.length;
   initialArticles = initialArticles.filter(a => a.id !== id);
-  return initialArticles.length < initialLen;
+  if (initialArticles.length < initialLen) {
+    deleted = true;
+  }
+  if (typeof window === 'undefined') {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const articlesDir = path.join(process.cwd(), 'data', 'articles');
+      if (fs.existsSync(articlesDir)) {
+        const files = fs.readdirSync(articlesDir);
+        for (const file of files) {
+          if (file.endsWith('.json')) {
+            const filePath = path.join(articlesDir, file);
+            const raw = fs.readFileSync(filePath, 'utf8');
+            const parsed = JSON.parse(raw);
+            if (parsed && (parsed.id === id || parsed.slug === id)) {
+              fs.unlinkSync(filePath);
+              deleted = true;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error deleting file article:', err);
+    }
+  }
+  return deleted;
 }
 
 export function slugify(text: string): string {

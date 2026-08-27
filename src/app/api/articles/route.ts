@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getArticles, addArticle, deleteArticle, updateArticle, searchArticles } from '@/lib/data';
+import { getArticles, addArticle, deleteArticle, updateArticle, searchArticles, getAnalytics } from '@/lib/data';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -16,10 +16,13 @@ export async function GET(request: Request) {
     articles = articles.filter(a => a.category.toLowerCase() === category.toLowerCase());
   }
 
+  const analytics = getAnalytics();
+
   return NextResponse.json({
     success: true,
     count: articles.length,
-    articles
+    articles,
+    analytics
   });
 }
 
