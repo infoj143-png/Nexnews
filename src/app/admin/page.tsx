@@ -22,9 +22,14 @@ import {
   AlertCircle,
   Lock,
   LogOut,
-  PenTool
+  PenTool,
+  Terminal,
+  Activity,
+  CheckCircle,
+  XCircle,
+  AlertTriangle
 } from 'lucide-react';
-import { Article, CATEGORIES, Category, getAnalytics, getArticles, slugify } from '@/lib/data';
+import { Article, CATEGORIES, Category, CronLog, getAnalytics, getArticles, slugify } from '@/lib/data';
 
 export default function AdminDashboardPage() {
   // Authentication State
@@ -33,9 +38,13 @@ export default function AdminDashboardPage() {
   const [loginError, setLoginError] = useState<string>('');
   const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'articles' | 'manual-publish' | 'ai-generator' | 'ad-settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'articles' | 'manual-publish' | 'ai-generator' | 'cron-logs' | 'ad-settings'>('overview');
   const [articles, setArticles] = useState<Article[]>([]);
   const [analytics, setAnalytics] = useState(getAnalytics());
+  const [cronLogs, setCronLogs] = useState<CronLog[]>([]);
+  const [cronLogsFilter, setCronLogsFilter] = useState<string>('all');
+  const [cronLogsSearch, setCronLogsSearch] = useState<string>('');
+  const [isClearingLogs, setIsClearingLogs] = useState(false);
   const [searchFilter, setSearchFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -154,11 +163,40 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const fetchCronLogs = async () => {
+    try {
+      const res = await fetch('/api/admin/cron-logs');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.logs)) {
+        setCronLogs(data.logs);
+      }
+    } catch (err) {
+      console.error('Error fetching cron logs:', err);
+    }
+  };
+
+  const handleClearCronLogs = async () => {
+    if (!confirm('Are you sure you want to clear all recorded cron logs?')) return;
+    setIsClearingLogs(true);
+    try {
+      const res = await fetch('/api/admin/cron-logs', { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setCronLogs([]);
+      }
+    } catch (err) {
+      console.error('Error clearing cron logs:', err);
+    } finally {
+      setIsClearingLogs(false);
+    }
+  };
+
   const fetchArticles = () => {
     setIsRefreshing(true);
     const data = getArticles();
     setArticles([...data]);
     setAnalytics(getAnalytics());
+    fetchCronLogs();
     setTimeout(() => setIsRefreshing(false), 300);
   };
 
@@ -365,6 +403,18 @@ export default function AdminDashboardPage() {
         >
           <Sparkles className="w-4 h-4 text-amber-300" />
           <span>AI News Generator</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('cron-logs')}
+          className={`px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all whitespace-nowrap ${
+            activeTab === 'cron-logs'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+          }`}
+        >
+          <Terminal className="w-4 h-4 text-cyan-400" />
+          <span>Cron Logs ({cronLogs.length})</span>
         </button>
 
         <button
@@ -840,6 +890,142 @@ export default function AdminDashboardPage() {
               )}
             </button>
           </form>
+        </div>
+      )}
+
+      {/* TAB 5: CRON LOGS PANEL */}
+      {activeTab === 'cron-logs' && (
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs space-y-0">
+          <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-cyan-500 font-bold text-xs uppercase tracking-wider mb-1">
+                <Terminal className="w-4 h-4" />
+                <span>Vercel Cron Run History</span>
+              </div>
+              <h3 className="text-xl font-bold font-serif text-slate-900 dark:text-white">
+                Cron Execution Logs
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">
+                In-database execution audit trail for /api/cron/auto-news without requiring paid Vercel logs.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={fetchCronLogs}
+                className="px-3.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all"
+              >
+                <RefreshCw className="w-3.5 h-3.5" /> Refresh
+              </button>
+              <button
+                onClick={handleClearCronLogs}
+                disabled={isClearingLogs || cronLogs.length === 0}
+                className="px-3.5 py-2 bg-red-50 dark:bg-red-950/60 hover:bg-red-100 dark:hover:bg-red-900/80 text-red-600 dark:text-red-300 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-red-200 dark:border-red-800/60 transition-all disabled:opacity-50"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Clear Logs
+              </button>
+            </div>
+          </div>
+
+          {/* Filter and Search Bar */}
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search log messages or details..."
+                value={cronLogsSearch}
+                onChange={(e) => setCronLogsSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <span className="text-xs text-slate-400 font-semibold">Filter Status:</span>
+              <select
+                value={cronLogsFilter}
+                onChange={(e) => setCronLogsFilter(e.target.value)}
+                className="px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold"
+              >
+                <option value="all">All Statuses ({cronLogs.length})</option>
+                <option value="success">Success ({cronLogs.filter(l => l.status === 'success').length})</option>
+                <option value="error">Error ({cronLogs.filter(l => l.status === 'error').length})</option>
+                <option value="unauthorized">Unauthorized ({cronLogs.filter(l => l.status === 'unauthorized').length})</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Logs Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs text-slate-600 dark:text-slate-300">
+              <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 font-bold uppercase tracking-wider text-[10px]">
+                <tr>
+                  <th className="p-4">Timestamp</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4">Message</th>
+                  <th className="p-4">Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {cronLogs
+                  .filter(log => {
+                    const matchesStatus = cronLogsFilter === 'all' || log.status === cronLogsFilter;
+                    const matchesSearch = !cronLogsSearch ||
+                      log.message.toLowerCase().includes(cronLogsSearch.toLowerCase()) ||
+                      JSON.stringify(log.details || {}).toLowerCase().includes(cronLogsSearch.toLowerCase());
+                    return matchesStatus && matchesSearch;
+                  })
+                  .map(log => (
+                    <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <td className="p-4 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                        {new Date(log.timestamp).toLocaleString()}
+                      </td>
+                      <td className="p-4 whitespace-nowrap">
+                        {log.status === 'success' && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                            <CheckCircle className="w-3 h-3 text-emerald-500" /> Success
+                          </span>
+                        )}
+                        {log.status === 'error' && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-red-100 dark:bg-red-950/80 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800">
+                            <XCircle className="w-3 h-3 text-red-500" /> Error
+                          </span>
+                        )}
+                        {log.status === 'unauthorized' && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                            <AlertTriangle className="w-3 h-3 text-amber-500" /> Unauthorized
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-4 font-medium text-slate-900 dark:text-slate-100 max-w-sm">
+                        {log.message}
+                      </td>
+                      <td className="p-4 max-w-md">
+                        {log.details ? (
+                          <details className="cursor-pointer group">
+                            <summary className="text-[11px] font-mono text-blue-600 dark:text-blue-400 group-hover:underline">
+                              View payload ({Object.keys(log.details).join(', ')})
+                            </summary>
+                            <pre className="mt-2 p-2.5 bg-slate-900 text-slate-200 text-[10px] font-mono rounded-lg overflow-x-auto max-h-40">
+                              {JSON.stringify(log.details, null, 2)}
+                            </pre>
+                          </details>
+                        ) : (
+                          <span className="text-slate-400 italic text-[11px]">No details recorded</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                {cronLogs.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="p-8 text-center text-slate-400 text-xs">
+                      No cron log entries recorded yet. Runs of /api/cron/auto-news will automatically record entries here.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

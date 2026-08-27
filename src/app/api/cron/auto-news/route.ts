@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { addArticle, Category } from '@/lib/data';
+import { addArticle, addCronLog, Category } from '@/lib/data';
 import { fetchTrendingNewsItem } from '@/lib/news-fetcher';
 import { generateGeoOptimizedNewsArticle } from '@/lib/ai-generator';
 
@@ -44,8 +44,17 @@ async function handleAutonomousPipeline(request: Request) {
   try {
     // 1. Verify Cron authorization
     if (!verifyCronSecret(request)) {
+      const authError = 'Unauthorized: Invalid or missing CRON_SECRET authorization.';
+      addCronLog({
+        status: 'unauthorized',
+        message: authError,
+        details: {
+          url: request.url,
+          headers: Object.fromEntries(request.headers.entries())
+        }
+      });
       return NextResponse.json(
-        { success: false, error: 'Unauthorized: Invalid or missing CRON_SECRET authorization.' },
+        { success: false, error: authError },
         { status: 401 }
       );
     }
@@ -80,20 +89,45 @@ async function handleAutonomousPipeline(request: Request) {
       aiGenerated: true
     });
 
+    const successMessage = 'Autonomous news article generated and auto-published live successfully.';
+    const sourceInfo = {
+      title: trendingItem.title,
+      sourceName: trendingItem.source,
+      link: trendingItem.link
+    };
+
+    addCronLog({
+      status: 'success',
+      message: successMessage,
+      details: {
+        source: sourceInfo,
+        articleId: publishedArticle.id,
+        articleTitle: publishedArticle.title,
+        articleSlug: publishedArticle.slug,
+        category: publishedArticle.category
+      }
+    });
+
     return NextResponse.json({
       success: true,
-      message: 'Autonomous news article generated and auto-published live successfully.',
-      source: {
-        title: trendingItem.title,
-        sourceName: trendingItem.source,
-        link: trendingItem.link
-      },
+      message: successMessage,
+      source: sourceInfo,
       article: publishedArticle,
       timestamp: new Date().toISOString()
     });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : 'Unknown pipeline error';
     console.error('Autonomous Content Pipeline Error:', err);
+
+    addCronLog({
+      status: 'error',
+      message: `Cron job execution failed: ${errorMessage}`,
+      details: {
+        error: errorMessage,
+        stack: err instanceof Error ? err.stack : undefined
+      }
+    });
+
     return NextResponse.json(
       {
         success: false,
