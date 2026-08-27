@@ -228,22 +228,57 @@ let initialArticles: Article[] = [
   }
 ];
 
-// Helper functions to manage state in memory
+// Helper to safely load JSON files from data/articles directory on server
+export function loadFileSystemArticles(): Article[] {
+  if (typeof window !== 'undefined') {
+    return [];
+  }
+  try {
+    // Dynamic require so browser bundles don't complain about 'fs' and 'path'
+    const fs = require('fs');
+    const path = require('path');
+    const articlesDir = path.join(process.cwd(), 'data', 'articles');
+    if (!fs.existsSync(articlesDir)) {
+      return [];
+    }
+    const files = fs.readdirSync(articlesDir);
+    const articles: Article[] = [];
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const filePath = path.join(articlesDir, file);
+        const raw = fs.readFileSync(filePath, 'utf8');
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.slug && parsed.title) {
+          articles.push(parsed);
+        }
+      }
+    }
+    return articles;
+  } catch (err) {
+    return [];
+  }
+}
+
+// Helper functions to manage state in memory and filesystem
 export function getArticles(): Article[] {
-  return initialArticles;
+  const fsArticles = loadFileSystemArticles();
+  const fsSlugs = new Set(fsArticles.map(a => a.slug));
+  const memoryOnly = initialArticles.filter(a => !fsSlugs.has(a.slug));
+  // Combine filesystem articles (newer first) with initial memory articles
+  return [...fsArticles, ...memoryOnly];
 }
 
 export function getArticleBySlug(slug: string): Article | undefined {
-  return initialArticles.find(a => a.slug === slug);
+  return getArticles().find(a => a.slug === slug);
 }
 
 export function getArticlesByCategory(category: Category): Article[] {
-  return initialArticles.filter(a => a.category.toLowerCase() === category.toLowerCase() && a.status === 'published');
+  return getArticles().filter(a => a.category.toLowerCase() === category.toLowerCase() && a.status === 'published');
 }
 
 export function searchArticles(query: string): Article[] {
   const q = query.toLowerCase();
-  return initialArticles.filter(a =>
+  return getArticles().filter(a =>
     a.title.toLowerCase().includes(q) ||
     a.summary.toLowerCase().includes(q) ||
     a.tags.some(t => t.toLowerCase().includes(q))
@@ -281,15 +316,16 @@ export function slugify(text: string): string {
 }
 
 export function getAnalytics(): AnalyticsData {
-  const totalArticles = initialArticles.length;
-  const publishedCount = initialArticles.filter(a => a.status === 'published').length;
-  const draftCount = initialArticles.filter(a => a.status === 'draft').length;
-  const aiGeneratedCount = initialArticles.filter(a => a.aiGenerated).length;
-  const manualCount = initialArticles.filter(a => !a.aiGenerated).length;
+  const articles = getArticles();
+  const totalArticles = articles.length;
+  const publishedCount = articles.filter(a => a.status === 'published').length;
+  const draftCount = articles.filter(a => a.status === 'draft').length;
+  const aiGeneratedCount = articles.filter(a => a.aiGenerated).length;
+  const manualCount = articles.filter(a => !a.aiGenerated).length;
 
   const categoryDistribution = CATEGORIES.map(cat => ({
     category: cat,
-    count: initialArticles.filter(a => a.category === cat).length
+    count: articles.filter(a => a.category === cat).length
   }));
 
   return {
