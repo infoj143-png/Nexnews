@@ -30,6 +30,8 @@ jobs:
           python scripts/auto_news.py
 
       - name: Commit and push generated news articles
+        env:
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -39,4 +41,10 @@ jobs:
           else
             git commit -m "feat(auto-news): publish automated background article"
             git push
+            if [ -n "$VERCEL_DEPLOY_HOOK_URL" ]; then
+              echo "Triggering Vercel Deploy Hook..."
+              curl -X POST "$VERCEL_DEPLOY_HOOK_URL"
+            else
+              echo "VERCEL_DEPLOY_HOOK_URL secret is not set, skipping deploy hook."
+            fi
           fi
