@@ -101,11 +101,6 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
               <span className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-blue-600 text-white">
                 {article.category}
               </span>
-              {article.aiGenerated && (
-                <span className="px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 flex items-center gap-1 border border-purple-200 dark:border-purple-800">
-                  <Sparkles className="w-3.5 h-3.5" /> AI Automated Content
-                </span>
-              )}
             </div>
 
             <h1 className="text-2xl sm:text-4xl font-black font-serif text-slate-900 dark:text-white leading-tight">

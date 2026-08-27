@@ -191,13 +191,27 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const fetchArticles = () => {
+  const fetchArticles = async () => {
     setIsRefreshing(true);
-    const data = getArticles();
-    setArticles([...data]);
-    setAnalytics(getAnalytics());
-    fetchCronLogs();
-    setTimeout(() => setIsRefreshing(false), 300);
+    try {
+      const res = await fetch('/api/articles');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.articles)) {
+        setArticles(data.articles);
+        if (data.analytics) {
+          setAnalytics(data.analytics);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching admin articles:', err);
+      // Fallback to local memory helper if network request fails
+      const data = getArticles();
+      setArticles([...data]);
+      setAnalytics(getAnalytics());
+    } finally {
+      fetchCronLogs();
+      setTimeout(() => setIsRefreshing(false), 300);
+    }
   };
 
   useEffect(() => {
@@ -213,11 +227,13 @@ export default function AdminDashboardPage() {
   });
 
   // Handle article deletion
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this article?')) {
-      const updated = articles.filter(a => a.id !== id);
-      setArticles(updated);
-      // mutate initial memory array
+      try {
+        await fetch(`/api/articles?id=${id}`, { method: 'DELETE' });
+      } catch (err) {
+        console.error('Error deleting article:', err);
+      }
       fetchArticles();
     }
   };
