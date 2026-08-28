@@ -25,8 +25,15 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ title, summary, 
   ]);
   const [commentText, setCommentText] = useState('');
   const [authorName, setAuthorName] = useState('');
+  const [currentUrl, setCurrentUrl] = useState<string>(`https://nexnews-nu.vercel.app/news/${slug}`);
 
-  const shareUrl = typeof window !== 'undefined' ? window.location.href : `https://nexnews-nu.vercel.app/news/${slug}`;
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setCurrentUrl(window.location.href);
+    }
+  }, []);
+
+  const shareUrl = currentUrl;
   const shareText = summary ? `${title} - ${summary}` : title;
 
   const handleCopy = async () => {

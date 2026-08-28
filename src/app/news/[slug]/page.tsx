@@ -51,6 +51,7 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
       type: 'article',
       publishedTime: article.publishedAt,
       authors: [article.author.name],
+      tags: article.tags,
       images: [
         {
           url: article.imageUrl,
