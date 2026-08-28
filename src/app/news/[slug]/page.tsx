@@ -37,6 +37,8 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
     };
   }
 
+  const articleUrl = `https://nexnews-nu.vercel.app/news/${article.slug}`;
+
   return {
     title: article.title,
     description: article.summary,
@@ -44,6 +46,8 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
     openGraph: {
       title: article.title,
       description: article.summary,
+      url: articleUrl,
+      siteName: 'Nexnews',
       type: 'article',
       publishedTime: article.publishedAt,
       authors: [article.author.name],
@@ -185,7 +189,7 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
           <AdBanner slot="in-article" provider="adsterra" />
 
           {/* Interactive Share & Comments */}
-          <ArticleActions title={article.title} slug={article.slug} />
+          <ArticleActions title={article.title} summary={article.summary} slug={article.slug} />
 
           {/* Related Articles Carousel/Grid */}
           {relatedArticles.length > 0 && (
