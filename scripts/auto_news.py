@@ -100,19 +100,19 @@ def slugify(text: str) -> str:
     return text.strip('-')
 
 def fetch_trending_topic() -> dict:
-    """Fetches a trending news item from Google Trends RSS (PK/Global) or fallback feeds."""
+    """Fetches real-time search keywords and news headlines from Google Trends RSS or news feeds."""
     random_feeds = list(TRENDING_FEEDS)
     random.shuffle(random_feeds)
 
-    headers = {"User-Agent": "Nexnews-AutoNews-PythonScript/1.0"}
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Nexnews-AutoNews/1.0"}
+    ns = {'ht': 'https://trends.google.com/trending/rss'}
 
     for feed in random_feeds:
         try:
             req = urllib.request.Request(feed["url"], headers=headers)
-            with urllib.request.urlopen(req, timeout=5) as response:
+            with urllib.request.urlopen(req, timeout=8) as response:
                 if response.status == 200:
                     xml_data = response.read().decode('utf-8', errors='ignore')
-                    # Parse XML items
                     root = ET.fromstring(xml_data)
                     items = root.findall('.//item')
                     if items:
@@ -120,19 +120,58 @@ def fetch_trending_topic() -> dict:
                         title_elem = selected_item.find('title')
                         desc_elem = selected_item.find('description')
 
-                        title = title_elem.text.strip() if title_elem is not None and title_elem.text else ""
-                        description = desc_elem.text.strip() if desc_elem is not None and desc_elem.text else ""
+                        raw_keyword = title_elem.text.strip() if title_elem is not None and title_elem.text else ""
+                        desc = desc_elem.text.strip() if desc_elem is not None and desc_elem.text else ""
+                        desc = re.sub(r'<[^>]+>', '', desc)
 
-                        # Clean HTML tags in description if present
-                        description = re.sub(r'<[^>]+>', '', description)
+                        # Extract Google Trends specific namespace elements
+                        traffic_elem = selected_item.find('ht:approx_traffic', ns)
+                        approx_traffic = traffic_elem.text.strip() if traffic_elem is not None and traffic_elem.text else ""
 
-                        if title and len(title) > 8:
-                            print(f"[+] Fetched trending topic from {feed['source']}: '{title}'")
+                        news_item = selected_item.find('ht:news_item', ns)
+                        news_headline = ""
+                        news_source = ""
+                        news_snippet = ""
+                        news_url = ""
+
+                        if news_item is not None:
+                            ht_title = news_item.find('ht:news_item_title', ns)
+                            ht_source = news_item.find('ht:news_item_source', ns)
+                            ht_snippet = news_item.find('ht:news_item_snippet', ns)
+                            ht_url = news_item.find('ht:news_item_url', ns)
+
+                            if ht_title is not None and ht_title.text:
+                                news_headline = re.sub(r'<[^>]+>', '', ht_title.text.strip())
+                            if ht_source is not None and ht_source.text:
+                                news_source = ht_source.text.strip()
+                            if ht_snippet is not None and ht_snippet.text:
+                                news_snippet = re.sub(r'<[^>]+>', '', ht_snippet.text.strip())
+                            if ht_url is not None and ht_url.text:
+                                news_url = ht_url.text.strip()
+
+                        source_name = news_source or feed["source"]
+                        trending_keyword = raw_keyword or news_headline
+                        description = news_snippet or desc or news_headline or raw_keyword
+
+                        # Construct article title context
+                        if news_headline:
+                            title = news_headline
+                        elif raw_keyword:
+                            title = f"Trending Search Analysis: {raw_keyword.title()}"
+                        else:
+                            title = ""
+
+                        if title and len(title) > 3:
+                            print(f"[+] Fetched trending topic from {feed['source']}: '{trending_keyword}' ({approx_traffic} searches)")
                             return {
                                 "title": title,
-                                "description": description or title,
+                                "trending_keyword": trending_keyword,
+                                "approx_traffic": approx_traffic or "High Search Volume",
+                                "headline": news_headline or title,
+                                "description": description,
                                 "category": feed["default_category"],
-                                "source": feed["source"]
+                                "source": source_name,
+                                "url": news_url
                             }
         except Exception as e:
             print(f"[-] Could not fetch feed {feed['source']}: {e}")
@@ -140,35 +179,47 @@ def fetch_trending_topic() -> dict:
 
     # Use fallback topic if RSS fetch fails
     selected = random.choice(FALLBACK_TOPICS)
+    fallback_keyword = selected.get("trending_keyword", selected["title"].split(":")[0])
+    selected["trending_keyword"] = fallback_keyword
+    selected["approx_traffic"] = "100K+ Search Volume"
+    selected["headline"] = selected["title"]
     print(f"[!] Using fallback trending topic: '{selected['title']}'")
     return selected
 
 def generate_article_gemini(topic: dict, api_key: str) -> dict:
-    """Generates an SEO/GEO optimized article using Google Gemini API."""
+    """Generates an SEO/GEO optimized article centered around high-demand search intent using Google Gemini API."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
 
+    trending_kw = topic.get("trending_keyword") or topic.get("title")
+    traffic = topic.get("approx_traffic") or "High Search Demand"
+    headline = topic.get("headline") or topic.get("title")
+
     prompt = f"""
-You are a senior tech & global affairs journalist writing for Nexnews (a leading digital news publication).
-Create an in-depth, highly authoritative, engaging, and SEO/GEO-optimized news article based on this trending topic:
+You are an expert SEO editor and senior news journalist at Nexnews.
+Create an in-depth, authoritative, engaging, and search-intent-optimized news article based on this real-time trending search query:
 
-TITLE: "{topic['title']}"
-SOURCE: "{topic['source']}"
-DESCRIPTION: "{topic['description']}"
-SUGGESTED CATEGORY: "{topic['category']}"
+TARGET TRENDING SEARCH KEYWORD: "{trending_kw}"
+ESTIMATED SEARCH DEMAND: "{traffic}"
+BREAKING HEADLINE / CONTEXT: "{headline}"
+SOURCE DISPATCH: "{topic.get('source', 'Nexnews Trend Radar')}"
+SUMMARY CONTEXT: "{topic.get('description', '')}"
+TARGET CATEGORY: "{topic.get('category', 'Tech')}"
 
-### GENERATIVE ENGINE OPTIMIZATION (GEO) & SEO REQUIREMENTS:
-1. Use clear <h2> and <h3> HTML tags for structural hierarchy.
-2. Include <ul> bullet lists with quantitative metrics, statistics, and concrete data points.
-3. Include a "Key Questions Answered" FAQ section resolving high-intent queries.
-4. Format HTML: wrap paragraphs in <p class="mb-4">, headings in <h2 class="text-2xl font-bold mt-6 mb-3"> or <h3 class="text-xl font-semibold mt-4 mb-2">, bullet lists in <ul class="list-disc pl-6 my-4 space-y-2">, and blockquotes in <blockquote class="border-l-4 border-blue-600 pl-4 my-6 italic text-slate-700 dark:text-slate-300 font-serif">.
+### SEARCH INTENT & SEO / GEO OPTIMIZATION MANDATES:
+1. Search Keyword Targeting: The main title and opening paragraph must seamlessly integrate the high-demand keyword "{trending_kw}" to capture maximum organic search traffic.
+2. User Intent Resolution: Resolve the user's search query immediately in the lead paragraph by addressing what happened, key developments, and real-world implications.
+3. Structural Hierarchy: Use clear <h2> and <h3> HTML tags for clean scanning and search engine indexing.
+4. Key Takeaways & Metrics: Include a bulleted <ul> list with concrete statistics, quantitative metrics, or key event timeline points.
+5. High-Intent FAQ Section: Include a "Key Questions Answered" or FAQ section using <h3> headings that answer long-tail search questions users ask about "{trending_kw}".
+6. HTML Formatting Standards: Wrap paragraphs in <p class="mb-4">, main sections in <h2 class="text-2xl font-bold mt-6 mb-3">, sub-headings in <h3 class="text-xl font-semibold mt-4 mb-2">, lists in <ul class="list-disc pl-6 my-4 space-y-2">, and blockquotes in <blockquote class="border-l-4 border-blue-600 pl-4 my-6 italic text-slate-700 dark:text-slate-300 font-serif">.
 
 Return ONLY a valid JSON object matching this schema:
 {{
-  "title": "SEO-rich, engaging headline",
+  "title": "SEO-rich, high-CTR headline containing target search terms",
   "slug": "url-friendly-slug-lowercase",
   "category": "Tech" | "World" | "Business" | "AI" | "Sports",
-  "summary": "1-2 sentence executive summary for AI search snippets",
-  "content": "Complete article HTML string containing h2, h3, p, ul, blockquote",
+  "summary": "1-2 sentence search snippet optimized executive summary",
+  "content": "Complete article HTML string containing h2, h3, p, ul, blockquote, direct search query resolutions",
   "tags": ["Tag1", "Tag2", "Tag3", "Tag4"]
 }}
 """
@@ -201,16 +252,22 @@ def generate_article_openai(topic: dict, api_key: str) -> dict:
     """Generates an SEO/GEO optimized article using OpenAI API."""
     url = "https://api.openai.com/v1/chat/completions"
 
+    trending_kw = topic.get("trending_keyword") or topic.get("title")
+
     prompt = f"""
-You are a senior news journalist for Nexnews. Create an in-depth SEO news article based on:
-TITLE: "{topic['title']}"
+You are a senior SEO journalist for Nexnews. Create an in-depth news article targeting the trending search query:
+TRENDING KEYWORD: "{trending_kw}"
+HEADLINE: "{topic.get('headline') or topic['title']}"
 SOURCE: "{topic['source']}"
 DESCRIPTION: "{topic['description']}"
 SUGGESTED CATEGORY: "{topic['category']}"
 
+Optimize title and content to resolve user search intent for "{trending_kw}".
+Include h2, h3 FAQ sections, p, ul with stats, and blockquotes.
+
 Return ONLY a valid JSON object:
 {{
-  "title": "SEO headline",
+  "title": "SEO headline targeting {trending_kw}",
   "slug": "url-friendly-slug",
   "category": "Tech" | "World" | "Business" | "AI" | "Sports",
   "summary": "1-2 sentence summary",
@@ -241,38 +298,41 @@ Return ONLY a valid JSON object:
 
 def generate_fallback_article(topic: dict) -> dict:
     """Generates a structured GEO fallback article when LLM API keys are absent or fail."""
-    title = topic["title"]
-    cat = topic["category"] if topic["category"] in VALID_CATEGORIES else "Tech"
+    trending_kw = topic.get("trending_keyword") or topic.get("title")
+    headline = topic.get("headline") or topic.get("title")
+    title = headline if headline else f"Trending Search Analysis: {trending_kw}"
+    cat = topic["category"] if topic.get("category") in VALID_CATEGORIES else "Tech"
     slug = slugify(title)
-    summary = f"Special automated dispatch on {title} featuring key statistics, operational impact, and strategic analysis."
+    traffic = topic.get("approx_traffic") or "High Search Volume"
+    summary = f"High-demand search trend analysis for '{trending_kw}' ({traffic}): Key developments, analysis, and strategic breakdown."
 
     content = f"""
-<p class="mb-4 font-serif text-lg leading-relaxed"><strong>AUTOMATED AI SPECIAL REPORT</strong> — Industry analysts and regional correspondents report significant developments regarding <strong>{title}</strong>. This detailed report examines key market indicators, operational ramifications, and the strategic outlook.</p>
+<p class="mb-4 font-serif text-lg leading-relaxed"><strong>AUTOMATED AI SEARCH TREND REPORT</strong> — Real-time search engine telemetry confirms surging query volumes for <strong>"{trending_kw}"</strong> ({traffic}). This special dispatch analyzes breaking news developments, underlying market forces, and search intent indicators behind this trend.</p>
 
-<h2 class="text-2xl font-bold mt-6 mb-3">Executive Summary & Key Metrics</h2>
-<p class="mb-4">Generative engine telemetry and digital indices confirm heightened interest across target sectors in Pakistan and international markets.</p>
+<h2 class="text-2xl font-bold mt-6 mb-3">Breaking Overview & Search Intent Metrics</h2>
+<p class="mb-4">Digital intelligence networks report heightened interest across regional and global digital platforms regarding <strong>{title}</strong>.</p>
 
 <ul class="list-disc pl-6 my-4 space-y-2">
-  <li><strong>Growth Velocity:</strong> Projected 45% expansion rate in operational adoption across key markets this quarter.</li>
-  <li><strong>Operational Efficiency:</strong> Integration benchmarks demonstrate up to a 38% reduction in latency and infrastructure costs.</li>
-  <li><strong>Economic Valuation:</strong> Industry projections model an addressable market impact exceeding $15 Billion by 2026.</li>
-  <li><strong>Regulatory Standards:</strong> Regional policy frameworks are aligning with international benchmarks to ensure compliance.</li>
+  <li><strong>Search Volume Velocity:</strong> Registered {traffic} in real-time search queries across primary search indices.</li>
+  <li><strong>Key Focus Area:</strong> {topic.get('description', title)}</li>
+  <li><strong>Market Sentiment:</strong> Positive engagement and rapid indexation across leading digital media channels.</li>
+  <li><strong>Regional & Global Reach:</strong> Sourced via {topic.get('source', 'Nexnews Trend Radar')}.</li>
 </ul>
 
 <blockquote class="border-l-4 border-blue-600 pl-4 my-6 italic text-slate-700 dark:text-slate-300 font-serif">
-  "The adoption of Generative Engine Optimization and automated content delivery ensures information accuracy and immediate search indexation."
+  "Aligning real-time search intent with Generative Engine Optimization ensures immediate content relevance and authority for high-demand topics."
 </blockquote>
 
-<h2 class="text-2xl font-bold mt-6 mb-3">Key Questions Answered (AI Query Resolution)</h2>
+<h2 class="text-2xl font-bold mt-6 mb-3">Key Questions Answered (Search Query Resolution)</h2>
 
-<h3 class="text-xl font-semibold mt-4 mb-2">What is the immediate significance of this development?</h3>
-<p class="mb-4">This development establishes a new benchmark for operational efficiency, enabling organizations in Pakistan and globally to streamline data delivery and decision-making.</p>
+<h3 class="text-xl font-semibold mt-4 mb-2">Why is "{trending_kw}" trending right now?</h3>
+<p class="mb-4">Surging interest in "{trending_kw}" is driven by breaking developments reported by {topic.get('source', 'major news outlets')}, highlighting significant shifts and immediate user interest.</p>
 
-<h3 class="text-xl font-semibold mt-4 mb-2">How does this impact the broader market landscape?</h3>
-<p class="mb-4">Key market participants benefit from lower overhead, improved compliance guarantees, and enhanced service delivery across digital touchpoints.</p>
+<h3 class="text-xl font-semibold mt-4 mb-2">What are the primary takeaways for readers?</h3>
+<p class="mb-4">This trending event underscores key industry changes, offering crucial insights for audience members tracking real-time updates and strategic market analysis.</p>
 
-<h2 class="text-2xl font-bold mt-6 mb-3">Future Strategic Outlook</h2>
-<p class="mb-4">As adoption continues to surge over the coming quarters, continuous monitoring and iterative optimization will remain vital for maintaining strategic advantages.</p>
+<h2 class="text-2xl font-bold mt-6 mb-3">Future Outlook & Ongoing Coverage</h2>
+<p class="mb-4">Nexnews will continue tracking real-time telemetry and search demand patterns for "{trending_kw}" as further details unfold.</p>
 """
 
     return {
@@ -281,7 +341,7 @@ def generate_fallback_article(topic: dict) -> dict:
         "category": cat,
         "summary": summary,
         "content": content,
-        "tags": [cat, "Automated-News", "Pakistan-Global", "Breaking", "GEO-Optimized"]
+        "tags": [cat, trending_kw, "Trending-Search", "Breaking-News", "SEO-Optimized"]
     }
 
 def main():

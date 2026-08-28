@@ -17,32 +17,40 @@ export async function generateGeoOptimizedNewsArticle(
 ): Promise<GeneratedArticleResult> {
   const apiKey = process.env.GEMINI_API_KEY;
 
+  const trendingKeyword = newsItem.trendingKeyword || newsItem.title;
+  const approxTraffic = newsItem.approxTraffic || 'High Search Volume';
+  const headline = newsItem.headline || newsItem.title;
+
   if (apiKey) {
     try {
       const ai = new GoogleGenAI({ apiKey });
 
       const prompt = `
-You are a senior tech & global affairs journalist and Generative Engine Optimization (GEO) specialist for Nexnews.
-Create an in-depth, authoritative, and engaging news article based on the following trending topic:
+You are an expert SEO editor and senior news journalist at Nexnews.
+Create an in-depth, authoritative, highly engaging, and search-intent-optimized news article based on this real-time trending search query:
 
-TITLE: "${newsItem.title}"
-SOURCE: "${newsItem.source}"
-DESCRIPTION: "${newsItem.description}"
-SUGGESTED CATEGORY: "${newsItem.category}"
+TARGET TRENDING SEARCH KEYWORD: "${trendingKeyword}"
+ESTIMATED SEARCH DEMAND: "${approxTraffic}"
+BREAKING HEADLINE / CONTEXT: "${headline}"
+SOURCE DISPATCH: "${newsItem.source}"
+SUMMARY CONTEXT: "${newsItem.description}"
+TARGET CATEGORY: "${newsItem.category}"
 
-### GENERATIVE ENGINE OPTIMIZATION (GEO) REQUIREMENTS:
-1. Structural Headings: Use clear <h2> and <h3> HTML tags for clean logical layout.
-2. Information Extraction: Include <ul> bullet point lists containing statistical data, metrics, and quantitative summaries so Generative AI search engines (ChatGPT, Google SGE, Gemini, Perplexity) easily extract key facts.
-3. Direct Query Resolution: Include a dedicated "Key Questions Answered" or FAQ section with direct, authoritative answers to high-intent queries.
-4. HTML Formatting: Wrap paragraphs in <p class="mb-4">, headings in <h2 class="text-2xl font-bold mt-6 mb-3"> or <h3 class="text-xl font-semibold mt-4 mb-2">, lists in <ul class="list-disc pl-6 my-4 space-y-2">, and blockquotes in <blockquote class="border-l-4 border-blue-600 pl-4 my-6 italic text-slate-700 dark:text-slate-300 font-serif">.
+### SEARCH INTENT & SEO / GEO OPTIMIZATION MANDATES:
+1. Primary Keyword Targeting: The title, slug, and opening paragraph must naturally integrate the target search keyword "${trendingKeyword}" to satisfy real-time user search demand.
+2. User Intent Resolution: Resolve the search query immediately in the lead section by explaining the core event, key players, and significance.
+3. Structural Layout: Use clear <h2> and <h3> HTML tags for structural scanning and rapid indexation.
+4. Metric & Fact Summaries: Include <ul> bullet point lists containing statistical data, metrics, or timeline facts for quick extraction by search engines and AI engines (Google Search, Gemini, ChatGPT, Perplexity).
+5. Search Intent FAQ: Include a dedicated "Key Questions Answered" or FAQ section using <h3> headings answering high-intent questions about "${trendingKeyword}".
+6. HTML Class Styling: Wrap paragraphs in <p class="mb-4">, headings in <h2 class="text-2xl font-bold mt-6 mb-3"> or <h3 class="text-xl font-semibold mt-4 mb-2">, lists in <ul class="list-disc pl-6 my-4 space-y-2">, and blockquotes in <blockquote class="border-l-4 border-blue-600 pl-4 my-6 italic text-slate-700 dark:text-slate-300 font-serif">.
 
 Return ONLY a valid JSON object matching this schema:
 {
-  "title": "SEO-rich, engaging headline",
+  "title": "SEO-rich, high-CTR headline containing target search terms",
   "slug": "url-friendly-slug-lowercase",
   "category": "Tech" | "World" | "Business" | "AI" | "Sports",
-  "excerpt": "A concise 1-2 sentence executive summary optimized for search engines and AI summaries",
-  "content": "Complete article HTML content containing h2, h3, p, ul, li, blockquote, direct answers, and statistical summaries",
+  "excerpt": "A concise 1-2 sentence executive summary optimized for search snippets and AI overviews",
+  "content": "Complete article HTML content containing h2, h3, p, ul, blockquote, direct answer sections",
   "tags": ["Tag1", "Tag2", "Tag3", "Tag4"]
 }
 `;
@@ -93,38 +101,41 @@ Return ONLY a valid JSON object matching this schema:
 }
 
 function generateFallbackGeoArticle(newsItem: TrendingNewsItem): GeneratedArticleResult {
-  const title = newsItem.title;
+  const trendingKeyword = newsItem.trendingKeyword || newsItem.title;
+  const headline = newsItem.headline || newsItem.title;
+  const title = headline;
   const slug = slugify(title);
   const category = newsItem.category;
-  const excerpt = `Comprehensive GEO synthesis on "${title}" detailing real-world impact, quantitative metrics, and expert analysis.`;
+  const traffic = newsItem.approxTraffic || 'High Search Volume';
+  const excerpt = `Search trend report on "${trendingKeyword}" (${traffic}): Analysis of key developments, search intent insights, and market impact.`;
 
   const content = `
-    <p class="mb-4 font-serif text-lg leading-relaxed"><strong>AUTOMATED AI SPECIAL REPORT</strong> — Industry analysts and global domain experts report significant developments regarding <strong>${title}</strong>. This detailed dispatch examines the operational ramifications, key market metrics, and strategic outlook.</p>
+    <p class="mb-4 font-serif text-lg leading-relaxed"><strong>AUTOMATED AI SEARCH TREND REPORT</strong> — Search engine indices report surging interest for <strong>"${trendingKeyword}"</strong> (${traffic}). This comprehensive analysis explores breaking coverage, search intent metrics, and strategic market takeaways.</p>
 
-    <h2 class="text-2xl font-bold mt-6 mb-3">Executive Summary & GEO Key Takeaways</h2>
-    <p class="mb-4">Generative engine telemetry highlights rapid indexation and widespread attention across international technical communities.</p>
+    <h2 class="text-2xl font-bold mt-6 mb-3">Executive Summary & Search Intent Metrics</h2>
+    <p class="mb-4">Digital search telemetry highlights significant query velocity for <strong>${title}</strong> across major platforms.</p>
 
     <ul class="list-disc pl-6 my-4 space-y-2">
-      <li><strong>Adoption Velocity:</strong> Estimated 42% growth rate across early-adopter enterprise sectors within the current quarter.</li>
-      <li><strong>Efficiency Gains:</strong> Operational benchmarking reveals up to a 35% reduction in latency and resource consumption.</li>
-      <li><strong>Market Impact:</strong> Industry valuation models project an total addressable market expansion of $14.2 Billion by 2027.</li>
-      <li><strong>Regulatory Alignment:</strong> Global compliance bodies are accelerating policy updates to harmonize multi-jurisdictional standards.</li>
+      <li><strong>Search Volume Demand:</strong> Registered ${traffic} in query traffic over recent monitoring windows.</li>
+      <li><strong>Coverage Context:</strong> ${newsItem.description || title}</li>
+      <li><strong>Source Attribution:</strong> Dispatched via ${newsItem.source}.</li>
+      <li><strong>Search Intent Classification:</strong> Informational and news discovery intent.</li>
     </ul>
 
     <blockquote class="border-l-4 border-blue-600 pl-4 my-6 italic text-slate-700 dark:text-slate-300 font-serif">
-      "The integration of Generative Engine Optimization principles ensures that autonomous information systems can accurately cite, contextualize, and evaluate complex industry developments."
+      "Aligning content with real-time Google search trends and Generative Engine Optimization standards maximizes organic reach and search index visibility."
     </blockquote>
 
-    <h2 class="text-2xl font-bold mt-6 mb-3">Key Questions Answered (AI Query Resolution)</h2>
+    <h2 class="text-2xl font-bold mt-6 mb-3">Key Questions Answered (Search Query Resolution)</h2>
 
-    <h3 class="text-xl font-semibold mt-4 mb-2">What is the primary significance of this development?</h3>
-    <p class="mb-4">This development establishes a new benchmark for speed and structural efficiency, allowing organizations to process and act on high-density information in real time.</p>
+    <h3 class="text-xl font-semibold mt-4 mb-2">Why is "${trendingKeyword}" seeing high search interest?</h3>
+    <p class="mb-4">Surging queries for "${trendingKeyword}" stem from breaking news developments, as detailed in reports by ${newsItem.source}.</p>
 
-    <h3 class="text-xl font-semibold mt-4 mb-2">How does this impact consumers and enterprise organizations?</h3>
-    <p class="mb-4">Enterprise organizations experience immediate workflow acceleration, while consumers benefit from improved service quality, higher security guarantees, and lower operational overhead.</p>
+    <h3 class="text-xl font-semibold mt-4 mb-2">What key insights should readers note?</h3>
+    <p class="mb-4">This trending topic indicates key industry shifts and audience engagement, reflecting broader interest in current developments.</p>
 
-    <h2 class="text-2xl font-bold mt-6 mb-3">Strategic Outlook & Next Steps</h2>
-    <p class="mb-4">As adoption broadens over the coming months, continuous monitoring and iterative optimizations will remain essential for maximizing long-term strategic value.</p>
+    <h2 class="text-2xl font-bold mt-6 mb-3">Strategic Outlook</h2>
+    <p class="mb-4">As search demand evolves, Nexnews continues monitoring real-time telemetry and indexation indicators for "${trendingKeyword}".</p>
   `;
 
   return {
@@ -133,7 +144,7 @@ function generateFallbackGeoArticle(newsItem: TrendingNewsItem): GeneratedArticl
     category,
     excerpt,
     content,
-    tags: [category, 'GEO-Optimized', 'AI-Synthesis', 'Breaking News', 'Nexnews Special'],
+    tags: [category, trendingKeyword, 'Search-Trend', 'GEO-Optimized', 'Breaking News'],
     aiGenerated: true
   };
 }

@@ -7,9 +7,22 @@ export interface TrendingNewsItem {
   pubDate?: string;
   source: string;
   category: Category;
+  trendingKeyword?: string;
+  approxTraffic?: string;
+  headline?: string;
 }
 
 const RSS_FEEDS: Array<{ url: string; source: string; category: Category }> = [
+  {
+    url: 'https://trends.google.com/trending/rss?geo=PK',
+    source: 'Google Trends Pakistan',
+    category: 'World'
+  },
+  {
+    url: 'https://trends.google.com/trending/rss?geo=US',
+    source: 'Google Trends Global',
+    category: 'Tech'
+  },
   {
     url: 'https://techcrunch.com/feed/',
     source: 'TechCrunch',
@@ -18,11 +31,6 @@ const RSS_FEEDS: Array<{ url: string; source: string; category: Category }> = [
   {
     url: 'https://news.ycombinator.com/rss',
     source: 'Hacker News',
-    category: 'Tech'
-  },
-  {
-    url: 'http://feeds.bbci.co.uk/news/technology/rss.xml',
-    source: 'BBC Tech',
     category: 'Tech'
   },
   {
@@ -87,12 +95,12 @@ export async function fetchTrendingNewsItem(): Promise<TrendingNewsItem> {
   for (const feed of shuffledFeeds) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
 
       const response = await fetch(feed.url, {
         signal: controller.signal,
         headers: {
-          'User-Agent': 'NexnewsBot/1.0 (Automated RSS Aggregator)'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) NexnewsBot/1.0'
         },
         cache: 'no-store'
       });
@@ -111,14 +119,30 @@ export async function fetchTrendingNewsItem(): Promise<TrendingNewsItem> {
           const description = extractTagValue(candidateXml, 'description') || extractTagValue(candidateXml, 'summary');
           const pubDate = extractTagValue(candidateXml, 'pubDate') || extractTagValue(candidateXml, 'published');
 
-          if (title && title.length > 10) {
+          // Check for Google Trends namespace elements (ht:approx_traffic, ht:news_item)
+          const approxTraffic = extractTagValue(candidateXml, 'ht:approx_traffic');
+          const newsHeadline = extractTagValue(candidateXml, 'ht:news_item_title');
+          const newsSource = extractTagValue(candidateXml, 'ht:news_item_source');
+          const newsSnippet = extractTagValue(candidateXml, 'ht:news_item_snippet');
+          const newsUrl = extractTagValue(candidateXml, 'ht:news_item_url');
+
+          const trendingKeyword = title;
+          const articleTitle = newsHeadline || (title ? `Trending Search Analysis: ${title}` : '');
+          const articleDesc = newsSnippet || description || articleTitle;
+          const source = newsSource || feed.source;
+          const articleUrl = newsUrl || link || feed.url;
+
+          if (articleTitle && articleTitle.length > 3) {
             return {
-              title,
-              link: link || feed.url,
-              description: description || title,
+              title: articleTitle,
+              link: articleUrl,
+              description: articleDesc,
               pubDate: pubDate || new Date().toISOString(),
-              source: feed.source,
-              category: feed.category
+              source,
+              category: feed.category,
+              trendingKeyword: trendingKeyword || articleTitle,
+              approxTraffic: approxTraffic || 'High Search Volume',
+              headline: newsHeadline || articleTitle
             };
           }
         }
@@ -136,6 +160,9 @@ export async function fetchTrendingNewsItem(): Promise<TrendingNewsItem> {
     description: selectedFallback.description,
     pubDate: new Date().toISOString(),
     source: selectedFallback.source,
-    category: selectedFallback.category
+    category: selectedFallback.category,
+    trendingKeyword: selectedFallback.title.split(' ')[0] || 'AI Trends',
+    approxTraffic: '100K+ Search Volume',
+    headline: selectedFallback.title
   };
 }
