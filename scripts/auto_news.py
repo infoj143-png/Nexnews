@@ -18,6 +18,10 @@ import urllib.request
 import urllib.parse
 import xml.etree.ElementTree as ET
 
+import requests
+from google.oauth2 import service_account
+from google.auth.transport.requests import AuthorizedSession
+
 # Category image fallbacks (Unsplash)
 CATEGORY_IMAGES = {
     "AI": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80",
@@ -427,6 +431,54 @@ def main():
     print(f" - Title: {title}")
     print(f" - Slug: {slug}")
     print(f" - Category: {cat}")
+
+    # Automatically submit newly published article to Google Indexing API
+    site_url = os.environ.get("SITE_URL", "https://nexnews-nu.vercel.app").rstrip("/")
+    article_url = f"{site_url}/news/{slug}"
+    submit_to_google_indexing(article_url)
+
+def submit_to_google_indexing(article_url: str) -> bool:
+    """
+    Retrieves service account JSON credentials from GCP_SA_KEY,
+    authenticates using Google Indexing API scope, and submits a POST request to publish the URL.
+    """
+    gcp_sa_key = os.environ.get("GCP_SA_KEY")
+    if not gcp_sa_key:
+        print("[-] GCP_SA_KEY environment variable is not set. Skipping Google Indexing API submission.")
+        return False
+
+    scopes = ["https://www.googleapis.com/auth/indexing"]
+    endpoint = "https://indexing.googleapis.com/v3/urlNotifications:publish"
+
+    try:
+        if os.path.isfile(gcp_sa_key):
+            credentials = service_account.Credentials.from_service_account_file(
+                gcp_sa_key, scopes=scopes
+            )
+        else:
+            sa_info = json.loads(gcp_sa_key)
+            credentials = service_account.Credentials.from_service_account_info(
+                sa_info, scopes=scopes
+            )
+
+        session = AuthorizedSession(credentials)
+        payload = {
+            "url": article_url,
+            "type": "URL_UPDATED"
+        }
+        response = session.post(endpoint, json=payload, timeout=15)
+
+        if response.status_code == 200:
+            print(f"[SUCCESS] Successfully submitted '{article_url}' to Google Indexing API.")
+            print(f" - Response: {response.text}")
+            return True
+        else:
+            print(f"[-] Failed to submit '{article_url}' to Google Indexing API. Status code: {response.status_code}")
+            print(f" - Response: {response.text}")
+            return False
+    except Exception as e:
+        print(f"[-] Error submitting '{article_url}' to Google Indexing API: {e}")
+        return False
 
 if __name__ == "__main__":
     main()
