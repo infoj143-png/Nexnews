@@ -228,21 +228,48 @@ let initialArticles: Article[] = [
   }
 ];
 
+function getArticlesDirectory(): { articlesDir: string; fs: typeof import('fs'); path: typeof import('path') } | null {
+  if (typeof window !== 'undefined') {
+    return null;
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fs = require('fs');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const path = require('path');
+
+    const candidates = [
+      path.join(process.cwd(), 'data', 'articles'),
+      path.resolve(process.cwd(), '..', 'data', 'articles'),
+      path.join(__dirname, '..', '..', '..', 'data', 'articles'),
+      path.join(__dirname, '..', '..', 'data', 'articles'),
+    ];
+    for (const candidate of candidates) {
+      try {
+        if (fs.existsSync(candidate)) {
+          return { articlesDir: candidate, fs, path };
+        }
+      } catch {
+        // Continue to next candidate
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 // Helper to safely load JSON files from data/articles directory on server
 export function loadFileSystemArticles(): Article[] {
   if (typeof window !== 'undefined') {
     return [];
   }
   try {
-    // Dynamic require so browser bundles don't complain about 'fs' and 'path'
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const fs = require('fs');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const path = require('path');
-    const articlesDir = path.join(process.cwd(), 'data', 'articles');
-    if (!fs.existsSync(articlesDir)) {
+    const res = getArticlesDirectory();
+    if (!res) {
       return [];
     }
+    const { articlesDir, fs, path } = res;
     const files = fs.readdirSync(articlesDir);
     const articles: Article[] = [];
     for (const file of files) {
@@ -317,12 +344,9 @@ export function deleteArticle(id: string): boolean {
   }
   if (typeof window === 'undefined') {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const fs = require('fs');
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const path = require('path');
-      const articlesDir = path.join(process.cwd(), 'data', 'articles');
-      if (fs.existsSync(articlesDir)) {
+      const res = getArticlesDirectory();
+      if (res) {
+        const { articlesDir, fs, path } = res;
         const files = fs.readdirSync(articlesDir);
         for (const file of files) {
           if (file.endsWith('.json')) {
