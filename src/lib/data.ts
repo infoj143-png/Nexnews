@@ -249,11 +249,13 @@ function getArticlesDirectory(): { articlesDir: string; fs: typeof import('fs');
         if (fs.existsSync(candidate)) {
           return { articlesDir: candidate, fs, path };
         }
-      } catch {
-        // Continue to next candidate
+      } catch (err) {
+        console.error(`[getArticlesDirectory] Error checking candidate directory path "${candidate}":`, err);
       }
     }
-  } catch {
+    console.error('[getArticlesDirectory] No valid articles directory found among candidates:', candidates);
+  } catch (err) {
+    console.error('[getArticlesDirectory] Error resolving module or candidates:', err);
     return null;
   }
   return null;
@@ -267,23 +269,37 @@ export function loadFileSystemArticles(): Article[] {
   try {
     const res = getArticlesDirectory();
     if (!res) {
+      console.error('[loadFileSystemArticles] Failed to locate articles directory (getArticlesDirectory returned null).');
       return [];
     }
     const { articlesDir, fs, path } = res;
-    const files = fs.readdirSync(articlesDir);
+    let files: string[];
+    try {
+      files = fs.readdirSync(articlesDir);
+    } catch (readdirErr) {
+      console.error(`[loadFileSystemArticles] Error reading directory "${articlesDir}":`, readdirErr);
+      return [];
+    }
     const articles: Article[] = [];
     for (const file of files) {
       if (file.endsWith('.json')) {
         const filePath = path.join(articlesDir, file);
-        const raw = fs.readFileSync(filePath, 'utf8');
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.slug && parsed.title) {
-          articles.push(parsed);
+        try {
+          const raw = fs.readFileSync(filePath, 'utf8');
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.slug && parsed.title) {
+            articles.push(parsed);
+          } else {
+            console.error(`[loadFileSystemArticles] Invalid article schema in file "${filePath}": missing slug or title.`);
+          }
+        } catch (fileErr) {
+          console.error(`[loadFileSystemArticles] Error reading or parsing file "${filePath}":`, fileErr);
         }
       }
     }
     return articles;
-  } catch {
+  } catch (err) {
+    console.error('[loadFileSystemArticles] Error loading file system articles:', err);
     return [];
   }
 }
