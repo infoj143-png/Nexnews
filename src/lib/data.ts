@@ -39,7 +39,7 @@ export interface CronLog {
   timestamp: string;
   status: 'success' | 'error' | 'unauthorized';
   message: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export const CATEGORIES: Category[] = ['Tech', 'World', 'Business', 'AI', 'Sports'];
@@ -235,7 +235,9 @@ export function loadFileSystemArticles(): Article[] {
   }
   try {
     // Dynamic require so browser bundles don't complain about 'fs' and 'path'
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const fs = require('fs');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const path = require('path');
     const articlesDir = path.join(process.cwd(), 'data', 'articles');
     if (!fs.existsSync(articlesDir)) {
@@ -254,7 +256,7 @@ export function loadFileSystemArticles(): Article[] {
       }
     }
     return articles;
-  } catch (err) {
+  } catch {
     return [];
   }
 }
@@ -315,7 +317,9 @@ export function deleteArticle(id: string): boolean {
   }
   if (typeof window === 'undefined') {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const fs = require('fs');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const path = require('path');
       const articlesDir = path.join(process.cwd(), 'data', 'articles');
       if (fs.existsSync(articlesDir)) {

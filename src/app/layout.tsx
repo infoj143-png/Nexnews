@@ -5,6 +5,7 @@ import { Header } from "@/components/layout/Header";
 import { BreakingTicker } from "@/components/layout/BreakingTicker";
 import { Footer } from "@/components/layout/Footer";
 import { AdBanner } from "@/components/ads/AdBanner";
+import { getArticles } from "@/lib/data";
 
 export const metadata: Metadata = {
   title: {
@@ -28,6 +29,8 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const articles = getArticles();
+
   return (
     <html lang="en" className="h-full">
       <body className="min-h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
@@ -43,7 +46,7 @@ export default function RootLayout({
         <Header />
 
         {/* Breaking News Ticker */}
-        <BreakingTicker />
+        <BreakingTicker articles={articles} />
 
         {/* Global Leaderboard Ad Banner Slot (728x90 Container) */}
         <div className="max-w-7xl mx-auto px-4 w-full">

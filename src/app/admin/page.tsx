@@ -1,17 +1,15 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   BarChart3,
   FileText,
   Sparkles,
-  TrendingUp,
   DollarSign,
   Plus,
   Trash2,
   Eye,
-  Edit3,
   CheckCircle2,
   Clock,
   Layers,
@@ -24,12 +22,11 @@ import {
   LogOut,
   PenTool,
   Terminal,
-  Activity,
   CheckCircle,
   XCircle,
   AlertTriangle
 } from 'lucide-react';
-import { Article, CATEGORIES, Category, CronLog, getAnalytics, getArticles, slugify } from '@/lib/data';
+import { Article, CATEGORIES, Category, CronLog, getAnalytics, getArticles } from '@/lib/data';
 
 export default function AdminDashboardPage() {
   // Authentication State
@@ -49,23 +46,100 @@ export default function AdminDashboardPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const checkAuthSession = async () => {
-    try {
-      const res = await fetch('/api/admin/me');
-      const data = await res.json();
-      if (data.success && data.authenticated) {
-        setIsAuthenticated(true);
-      } else {
-        setIsAuthenticated(false);
+  useEffect(() => {
+    let isMounted = true;
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/admin/me');
+        const data = await res.json();
+        if (isMounted) {
+          setIsAuthenticated(!!(data.success && data.authenticated));
+        }
+      } catch {
+        if (isMounted) setIsAuthenticated(false);
       }
-    } catch {
-      setIsAuthenticated(false);
+    }
+    checkAuth();
+    return () => { isMounted = false; };
+  }, []);
+
+  // AI Generator Form state
+  const [topicInput, setTopicInput] = useState('');
+  const [targetCategory, setTargetCategory] = useState<Category>('Tech');
+  const [generating, setGenerating] = useState(false);
+  const [genSuccessMsg, setGenSuccessMsg] = useState('');
+
+  // Manual Article Publishing Form state
+  const [manualTitle, setManualTitle] = useState('');
+  const [manualCategory, setManualCategory] = useState<Category>('Tech');
+  const [manualContent, setManualContent] = useState('');
+  const [manualSummary, setManualSummary] = useState('');
+  const [manualAuthorName, setManualAuthorName] = useState('');
+  const [manualImageUrl, setManualImageUrl] = useState('');
+  const [publishingManual, setPublishingManual] = useState(false);
+  const [manualSuccessMsg, setManualSuccessMsg] = useState('');
+  const [manualErrorMsg, setManualErrorMsg] = useState('');
+
+  const fetchCronLogs = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/cron-logs');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.logs)) {
+        setCronLogs(data.logs);
+      }
+    } catch (err) {
+      console.error('Error fetching cron logs:', err);
+    }
+  }, []);
+
+  const handleClearCronLogs = async () => {
+    if (!confirm('Are you sure you want to clear all recorded cron logs?')) return;
+    setIsClearingLogs(true);
+    try {
+      const res = await fetch('/api/admin/cron-logs', { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setCronLogs([]);
+      }
+    } catch (err) {
+      console.error('Error clearing cron logs:', err);
+    } finally {
+      setIsClearingLogs(false);
     }
   };
 
+  const fetchArticles = useCallback(async () => {
+    try {
+      const res = await fetch('/api/articles');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.articles)) {
+        setArticles(data.articles);
+        if (data.analytics) {
+          setAnalytics(data.analytics);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching admin articles:', err);
+      const data = getArticles();
+      setArticles([...data]);
+      setAnalytics(getAnalytics());
+    } finally {
+      fetchCronLogs();
+    }
+  }, [fetchCronLogs]);
+
+  const handleSyncData = async () => {
+    setIsRefreshing(true);
+    await fetchArticles();
+    setTimeout(() => setIsRefreshing(false), 300);
+  };
+
   useEffect(() => {
-    checkAuthSession();
-  }, []);
+    const frame = requestAnimationFrame(() => {
+      fetchArticles();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [fetchArticles]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,27 +177,6 @@ export default function AdminDashboardPage() {
       setIsAuthenticated(false);
     }
   };
-
-  // AI Generator Form state
-  const [topicInput, setTopicInput] = useState('');
-  const [targetCategory, setTargetCategory] = useState<Category>('Tech');
-  const [generating, setGenerating] = useState(false);
-  const [genSuccessMsg, setGenSuccessMsg] = useState('');
-
-  // Manual Article Publishing Form state
-  const [manualTitle, setManualTitle] = useState('');
-  const [manualCategory, setManualCategory] = useState<Category>('Tech');
-  const [manualContent, setManualContent] = useState('');
-  const [manualSummary, setManualSummary] = useState('');
-  const [manualAuthorName, setManualAuthorName] = useState('');
-  const [manualImageUrl, setManualImageUrl] = useState('');
-  const [publishingManual, setPublishingManual] = useState(false);
-  const [manualSuccessMsg, setManualSuccessMsg] = useState('');
-  const [manualErrorMsg, setManualErrorMsg] = useState('');
-
-  // Manual / Edit Form state
-  const [editingArticle, setEditingArticle] = useState<Partial<Article> | null>(null);
-  const [showEditModal, setShowEditModal] = useState(false);
 
   const handlePublishManual = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -176,61 +229,6 @@ export default function AdminDashboardPage() {
       setPublishingManual(false);
     }
   };
-
-  const fetchCronLogs = async () => {
-    try {
-      const res = await fetch('/api/admin/cron-logs');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.logs)) {
-        setCronLogs(data.logs);
-      }
-    } catch (err) {
-      console.error('Error fetching cron logs:', err);
-    }
-  };
-
-  const handleClearCronLogs = async () => {
-    if (!confirm('Are you sure you want to clear all recorded cron logs?')) return;
-    setIsClearingLogs(true);
-    try {
-      const res = await fetch('/api/admin/cron-logs', { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
-        setCronLogs([]);
-      }
-    } catch (err) {
-      console.error('Error clearing cron logs:', err);
-    } finally {
-      setIsClearingLogs(false);
-    }
-  };
-
-  const fetchArticles = async () => {
-    setIsRefreshing(true);
-    try {
-      const res = await fetch('/api/articles');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.articles)) {
-        setArticles(data.articles);
-        if (data.analytics) {
-          setAnalytics(data.analytics);
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching admin articles:', err);
-      // Fallback to local memory helper if network request fails
-      const data = getArticles();
-      setArticles([...data]);
-      setAnalytics(getAnalytics());
-    } finally {
-      fetchCronLogs();
-      setTimeout(() => setIsRefreshing(false), 300);
-    }
-  };
-
-  useEffect(() => {
-    fetchArticles();
-  }, []);
 
   // Filtered article list
   const filteredArticles = articles.filter(a => {
@@ -359,7 +357,7 @@ export default function AdminDashboardPage() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={fetchArticles}
+            onClick={handleSyncData}
             className={`px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs flex items-center gap-2 border border-slate-700 transition-all ${
               isRefreshing ? 'animate-spin' : ''
             }`}

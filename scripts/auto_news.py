@@ -457,6 +457,21 @@ def main():
     summary = generated_article_data.get("summary", selected_topic["description"])
     raw_content = generated_article_data.get("content", "")
     content = sanitize_article_content(raw_content)
+
+    source_name = selected_topic.get("source")
+    source_url = selected_topic.get("url")
+    if source_name or source_url:
+        attribution_html = ""
+        if source_url and source_name:
+            attribution_html = f'<p class="mt-6 text-sm text-slate-500 border-t border-slate-200 dark:border-slate-800 pt-4 font-serif">Coverage compiled via <a href="{source_url}" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 underline hover:text-blue-800">{source_name}</a>.</p>'
+        elif source_name:
+            attribution_html = f'<p class="mt-6 text-sm text-slate-500 border-t border-slate-200 dark:border-slate-800 pt-4 font-serif">Coverage compiled via {source_name}.</p>'
+        elif source_url:
+            attribution_html = f'<p class="mt-6 text-sm text-slate-500 border-t border-slate-200 dark:border-slate-800 pt-4 font-serif">Coverage compiled via <a href="{source_url}" target="_blank" rel="noopener noreferrer" class="text-blue-600 dark:text-blue-400 underline hover:text-blue-800">Original Source</a>.</p>'
+
+        if attribution_html:
+            content += "\n" + attribution_html
+
     tags = generated_article_data.get("tags", [cat, "News", "AI-Generated"])
 
     published_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
