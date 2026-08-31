@@ -256,25 +256,98 @@ def is_duplicate_candidate(candidate: dict, recent_topics: set) -> bool:
 
     return False
 
+import bleach
+
+ALLOWED_TAGS = [
+    'p', 'h2', 'h3', 'ul', 'ol', 'li', 'blockquote',
+    'strong', 'em', 'b', 'i', 'a', 'span', 'br'
+]
+
+ALLOWED_ATTRIBUTES = {
+    'a': ['href', 'target', 'rel', 'class'],
+    'p': ['class'],
+    'h2': ['class'],
+    'h3': ['class'],
+    'ul': ['class'],
+    'ol': ['class'],
+    'li': ['class'],
+    'blockquote': ['class'],
+    'strong': ['class'],
+    'em': ['class'],
+    'b': ['class'],
+    'i': ['class'],
+    'span': ['class'],
+    'br': ['class']
+}
+
 def sanitize_article_content(html_str: str) -> str:
-    """Sanitizes HTML content server-side by stripping scripts, style tags, and inline event handlers."""
+    """Sanitizes HTML content server-side using bleach library with allowlist policy."""
     if not html_str:
         return ""
-    # Strip script and style blocks
-    clean = re.sub(r'<(script|style)[^>]*>[\s\S]*?</\1>', '', html_str, flags=re.IGNORECASE)
-    # Strip inline event handlers (onerror=, onclick=, etc.)
-    clean = re.sub(r'\s+on[a-z]+\s*=\s*(("[^"]*")|(\'[^\']*\')|([^\s>]+))', '', clean, flags=re.IGNORECASE)
-    # Strip javascript: URLs
-    clean = re.sub(r'href\s*=\s*["\']?\s*javascript:[^"\' >]*["\']?', 'href="#"', clean, flags=re.IGNORECASE)
+    clean = bleach.clean(
+        html_str,
+        tags=ALLOWED_TAGS,
+        attributes=ALLOWED_ATTRIBUTES,
+        strip=True
+    )
     return clean
+
+def sanitize_prompt_input(input_str: str, max_len: int = 300) -> str:
+    """Strips control characters and instruction override phrases from external inputs before prompt insertion."""
+    if not input_str:
+        return ""
+    clean = re.sub(r'[\r\n\t]+', ' ', input_str)
+    clean = re.sub(r'["`\\]', '', clean)
+    clean = re.sub(r'ignore previous instructions', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'system prompt', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'you are an ai', '', clean, flags=re.IGNORECASE)
+    clean = clean.strip()
+    return clean[:max_len]
+
+def validate_article_output(data: dict) -> bool:
+    """Defensive schema and heuristic validation on LLM JSON output."""
+    if not data or not isinstance(data, dict):
+        return False
+
+    title = data.get("title", "")
+    summary = data.get("summary", "")
+    content = data.get("content", "")
+    category = data.get("category", "")
+
+    if not isinstance(title, str) or len(title.strip()) < 5:
+        return False
+    if not isinstance(summary, str) or len(summary.strip()) < 5:
+        return False
+    if not isinstance(content, str) or len(content.strip()) < 20:
+        return False
+    if category and category not in VALID_CATEGORIES:
+        return False
+
+    content_lower = content.lower()
+    suspicious_patterns = [
+        "as an ai",
+        "i cannot fulfill",
+        "system prompt",
+        "ignore all previous",
+        "jailbreak",
+        "<script"
+    ]
+    for pattern in suspicious_patterns:
+        if pattern in content_lower:
+            print(f"[-] [DEFENSIVE CHECK] Article output rejected due to suspicious pattern: '{pattern}'")
+            return False
+
+    return True
 
 def generate_article_gemini(topic: dict, api_key: str) -> dict:
     """Generates an SEO/GEO optimized article centered around high-demand search intent using Google Gemini API."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
 
-    trending_kw = topic.get("trending_keyword") or topic.get("title")
-    traffic = topic.get("approx_traffic") or "High Search Demand"
-    headline = topic.get("headline") or topic.get("title")
+    trending_kw = sanitize_prompt_input(topic.get("trending_keyword") or topic.get("title"))
+    traffic = sanitize_prompt_input(topic.get("approx_traffic") or "High Search Demand")
+    headline = sanitize_prompt_input(topic.get("headline") or topic.get("title"))
+    source = sanitize_prompt_input(topic.get("source") or "Nexnews Trend Radar")
+    desc = sanitize_prompt_input(topic.get("description") or "")
 
     prompt = f"""
 You are an expert SEO editor and senior news journalist at Nexnews.
@@ -328,20 +401,23 @@ Return ONLY a valid JSON object matching this schema:
         raw_text = re.sub(r'\s*```$', '', raw_text, flags=re.MULTILINE)
 
         parsed = json.loads(raw_text.strip())
-        return parsed
+        return parsed if validate_article_output(parsed) else None
 
 def generate_article_openai(topic: dict, api_key: str) -> dict:
     """Generates an SEO/GEO optimized article using OpenAI API."""
     url = "https://api.openai.com/v1/chat/completions"
 
-    trending_kw = topic.get("trending_keyword") or topic.get("title")
+    trending_kw = sanitize_prompt_input(topic.get("trending_keyword") or topic.get("title"))
+    headline = sanitize_prompt_input(topic.get('headline') or topic.get('title'))
+    source = sanitize_prompt_input(topic.get('source', 'Nexnews Trend Radar'))
+    desc = sanitize_prompt_input(topic.get('description', ''))
 
     prompt = f"""
 You are a senior SEO journalist for Nexnews. Create an in-depth news article targeting the trending search query:
 TRENDING KEYWORD: "{trending_kw}"
-HEADLINE: "{topic.get('headline') or topic['title']}"
-SOURCE: "{topic['source']}"
-DESCRIPTION: "{topic['description']}"
+HEADLINE: "{headline}"
+SOURCE: "{source}"
+DESCRIPTION: "{desc}"
 
 Optimize title and content to resolve user search intent for "{trending_kw}".
 Classify category as one of: Tech, World, Business, AI, Sports.
@@ -376,7 +452,8 @@ Return ONLY a valid JSON object:
     with urllib.request.urlopen(req, timeout=30) as response:
         res_data = json.loads(response.read().decode('utf-8'))
         raw_text = res_data["choices"][0]["message"]["content"]
-        return json.loads(raw_text.strip())
+        parsed = json.loads(raw_text.strip())
+        return parsed if validate_article_output(parsed) else None
 
 def main():
     print("==================================================")

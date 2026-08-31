@@ -332,6 +332,15 @@ export function searchArticles(query: string): Article[] {
 
 import { sanitizeHtml } from './sanitize';
 
+/**
+ * Adds an article to in-memory state and persists to disk under `data/articles/<slug>.json`.
+ *
+ * NOTE ON SERVERLESS PERSISTENCE:
+ * In a serverless environment like Vercel, writing to the filesystem persists to the ephemeral local filesystem
+ * of that specific serverless invocation instance. It survives across requests on that instance, but will not
+ * automatically be committed to Git or shared across serverless cold starts. The automated Python pipeline
+ * (`scripts/auto_news.py` via GitHub Actions) remains the primary method for Git-committed durable articles.
+ */
 export function addArticle(article: Omit<Article, 'id' | 'views'>): Article {
   const sanitizedContent = sanitizeHtml(article.content);
   const newArticle: Article = {
@@ -341,6 +350,20 @@ export function addArticle(article: Omit<Article, 'id' | 'views'>): Article {
     views: 0,
   };
   initialArticles = [newArticle, ...initialArticles];
+
+  if (typeof window === 'undefined') {
+    try {
+      const res = getArticlesDirectory();
+      if (res) {
+        const { articlesDir, fs, path } = res;
+        const filePath = path.join(articlesDir, `${newArticle.slug}.json`);
+        fs.writeFileSync(filePath, JSON.stringify(newArticle, null, 2), 'utf8');
+      }
+    } catch (err) {
+      console.error('[addArticle] Error writing article JSON to disk:', err);
+    }
+  }
+
   return newArticle;
 }
 

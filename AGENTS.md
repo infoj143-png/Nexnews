@@ -10,9 +10,11 @@ Nexnews is an autonomous Next.js 16 (App Router) news publishing platform deploy
 * **Instant Indexation:** After writing JSON files to `data/articles/<slug>.json`, new article URLs are automatically submitted to the Google Indexing API (`submit_to_google_indexing()`).
 * **Deprecated Pipeline:** The TypeScript Vercel Cron route `/api/cron/auto-news` was retired to avoid duplicate publishing.
 
-## Design Decisions
+## Design Decisions & Persistence Behavior
 1. **No Manual Review Gate:** Articles are published live immediately upon generation to capture real-time search velocity while trends are hot. Do not introduce an approval gate or moderation queue.
-2. **File-Based Persistence:** Articles are persisted as JSON files in `data/articles/*.json` and committed directly to the repository. Database migration is explicitly deferred to a future task.
+2. **File-Based Persistence:**
+   - **Python Cron Pipeline (`scripts/auto_news.py`):** Durably persists articles by creating `data/articles/<slug>.json` and committing the JSON files directly to the Git repository via GitHub Actions workflow.
+   - **Next.js Admin UI & API Routes (`addArticle` in `src/lib/data.ts` / `/api/generate-news` / `/api/articles`):** Writes `data/articles/<slug>.json` to local serverless filesystem disk in addition to in-memory state. In serverless deployments (Vercel), local disk writes persist to that specific execution container instance; durable repo-wide persistence across redeployments relies on Python pipeline repository commits.
 
 ## Environment Variables Required
 * `ADMIN_SESSION_SECRET` - Server-only secret key for signing admin JWT cookies.
