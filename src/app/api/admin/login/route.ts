@@ -2,8 +2,104 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { signAdminToken, COOKIE_NAME } from '@/lib/auth';
 
+interface LoginAttempt {
+  count: number;
+  firstAttemptTime: number;
+  lockoutUntil: number;
+}
+
+// In-memory store for rate limiting by IP (sliding window / lockout)
+const loginAttempts = new Map<string, LoginAttempt>();
+
+const MAX_ATTEMPTS = 5;
+const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes lockout
+
+function getClientIp(request: Request): string {
+  const xff = request.headers.get('x-forwarded-for');
+  if (xff) {
+    return xff.split(',')[0].trim();
+  }
+  const xreal = request.headers.get('x-real-ip');
+  if (xreal) {
+    return xreal.trim();
+  }
+  return '127.0.0.1';
+}
+
+function checkRateLimit(ip: string): { allowed: boolean; retryAfterSeconds?: number } {
+  const now = Date.now();
+  const attempt = loginAttempts.get(ip);
+
+  if (!attempt) {
+    return { allowed: true };
+  }
+
+  // Check if currently locked out
+  if (attempt.lockoutUntil > now) {
+    const retryAfter = Math.ceil((attempt.lockoutUntil - now) / 1000);
+    return { allowed: false, retryAfterSeconds: retryAfter };
+  }
+
+  // Check if window expired
+  if (now - attempt.firstAttemptTime > WINDOW_MS) {
+    loginAttempts.delete(ip);
+    return { allowed: true };
+  }
+
+  if (attempt.count >= MAX_ATTEMPTS) {
+    attempt.lockoutUntil = now + LOCKOUT_MS;
+    console.warn(`[SECURITY LOCKOUT] IP ${ip} exceeded maximum login attempts (${MAX_ATTEMPTS}). Locked out for 15 minutes.`);
+    const retryAfter = Math.ceil(LOCKOUT_MS / 1000);
+    return { allowed: false, retryAfterSeconds: retryAfter };
+  }
+
+  return { allowed: true };
+}
+
+function recordFailedAttempt(ip: string) {
+  const now = Date.now();
+  const attempt = loginAttempts.get(ip);
+
+  if (!attempt || (now - attempt.firstAttemptTime > WINDOW_MS)) {
+    loginAttempts.set(ip, {
+      count: 1,
+      firstAttemptTime: now,
+      lockoutUntil: 0,
+    });
+  } else {
+    attempt.count += 1;
+    if (attempt.count >= MAX_ATTEMPTS) {
+      attempt.lockoutUntil = now + LOCKOUT_MS;
+      console.warn(`[SECURITY LOCKOUT] IP ${ip} exceeded maximum login attempts (${MAX_ATTEMPTS}). Locked out for 15 minutes.`);
+    }
+  }
+}
+
+function resetAttempts(ip: string) {
+  loginAttempts.delete(ip);
+}
+
 export async function POST(request: Request) {
   try {
+    const ip = getClientIp(request);
+    const rateCheck = checkRateLimit(ip);
+
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Too many failed login attempts. Account temporarily locked. Please try again in ${rateCheck.retryAfterSeconds} seconds.`
+        },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateCheck.retryAfterSeconds || 900)
+          }
+        }
+      );
+    }
+
     const { password } = await request.json();
 
     if (!password) {
@@ -33,6 +129,8 @@ export async function POST(request: Request) {
     }
 
     if (isValid) {
+      resetAttempts(ip);
+
       const token = signAdminToken();
       const isProduction = process.env.NODE_ENV === 'production';
 
@@ -54,6 +152,8 @@ export async function POST(request: Request) {
 
       return response;
     }
+
+    recordFailedAttempt(ip);
 
     return NextResponse.json(
       { success: false, error: 'Invalid admin password' },

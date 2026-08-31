@@ -10,6 +10,55 @@ const categoryImages: Record<Category, string> = {
   Sports: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80'
 };
 
+const VALID_CATEGORIES: Category[] = ['Tech', 'World', 'Business', 'AI', 'Sports'];
+
+function sanitizePromptInput(input: string, maxLength: number = 300): string {
+  if (!input) return '';
+  let sanitized = input
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/["`\\]/g, '')
+    .replace(/ignore previous instructions/gi, '')
+    .replace(/system prompt/gi, '')
+    .replace(/you are an ai/gi, '')
+    .trim();
+  if (sanitized.length > maxLength) {
+    sanitized = sanitized.substring(0, maxLength);
+  }
+  return sanitized;
+}
+
+function validateArticleOutput(data: unknown): boolean {
+  if (!data || typeof data !== 'object' || data === null) return false;
+
+  const articleObj = data as Record<string, unknown>;
+  const { title, summary, content, category } = articleObj;
+
+  if (typeof title !== 'string' || title.trim().length < 5) return false;
+  if (typeof summary !== 'string' || summary.trim().length < 5) return false;
+  if (typeof content !== 'string' || content.trim().length < 20) return false;
+  if (category && typeof category === 'string' && !(VALID_CATEGORIES as string[]).includes(category)) return false;
+
+  // Basic heuristic check for echoed injection / prompt hijacking
+  const contentLower = content.toLowerCase();
+  const suspiciousPatterns = [
+    'as an ai',
+    'i cannot fulfill',
+    'system prompt',
+    'ignore all previous',
+    'jailbreak',
+    '<script'
+  ];
+
+  for (const pattern of suspiciousPatterns) {
+    if (contentLower.includes(pattern)) {
+      console.warn(`[DEFENSIVE CHECK] Article generation rejected due to suspicious pattern: "${pattern}"`);
+      return false;
+    }
+  }
+
+  return true;
+}
+
 interface GeneratedArticleData {
   title?: string;
   slug?: string;
@@ -59,7 +108,8 @@ Return ONLY a valid JSON object matching this schema:
   if (!rawText) return null;
 
   const cleaned = rawText.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
-  return JSON.parse(cleaned);
+  const parsed = JSON.parse(cleaned);
+  return validateArticleOutput(parsed) ? parsed : null;
 }
 
 async function callOpenAiApi(topic: string, category: Category, apiKey: string): Promise<GeneratedArticleData | null> {
@@ -100,7 +150,8 @@ Return ONLY a valid JSON object:
   const rawText = data?.choices?.[0]?.message?.content;
   if (!rawText) return null;
 
-  return JSON.parse(rawText.trim());
+  const parsed = JSON.parse(rawText.trim());
+  return validateArticleOutput(parsed) ? parsed : null;
 }
 
 export async function POST(request: Request) {
@@ -111,8 +162,11 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const topic = body.topic?.trim() || 'Breakthrough in AI and Automated Technology Systems';
-    const category: Category = body.category || 'AI';
+    const rawTopic = body.topic?.trim() || 'Breakthrough in AI and Automated Technology Systems';
+    const topic = sanitizePromptInput(rawTopic, 300);
+    const category: Category = (typeof body.category === 'string' && (VALID_CATEGORIES as string[]).includes(body.category))
+      ? (body.category as Category)
+      : 'AI';
 
     const geminiKey = process.env.GEMINI_API_KEY;
     const openaiKey = process.env.OPENAI_API_KEY;
@@ -140,7 +194,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           success: false,
-          error: `AI Article Generation Failed: ${apiErrorMsg || 'No valid AI API key available (GEMINI_API_KEY / OPENAI_API_KEY).'}`
+          error: `AI Article Generation Failed: ${apiErrorMsg || 'Generated output failed schema validation or prompt injection checks.'}`
         },
         { status: 500 }
       );
@@ -150,7 +204,7 @@ export async function POST(request: Request) {
     const slug = slugify(generatedData.slug || title);
     const summary = generatedData.summary?.trim() || title;
     const content = generatedData.content.trim();
-    const finalCategory = (generatedData.category && ['Tech', 'World', 'Business', 'AI', 'Sports'].includes(generatedData.category))
+    const finalCategory = (generatedData.category && VALID_CATEGORIES.includes(generatedData.category))
       ? generatedData.category
       : category;
     const tags = Array.isArray(generatedData.tags) && generatedData.tags.length > 0
