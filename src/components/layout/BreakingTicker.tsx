@@ -3,10 +3,13 @@
 import React from 'react';
 import Link from 'next/link';
 import { Flame, Zap } from 'lucide-react';
-import { getArticles } from '@/lib/data';
+import { Article } from '@/lib/data';
 
-export const BreakingTicker: React.FC = () => {
-  const articles = getArticles();
+interface BreakingTickerProps {
+  articles?: Article[];
+}
+
+export const BreakingTicker: React.FC<BreakingTickerProps> = ({ articles = [] }) => {
   const breakingNews = articles.filter(a => a.isBreaking || a.isTrending);
 
   if (breakingNews.length === 0) return null;

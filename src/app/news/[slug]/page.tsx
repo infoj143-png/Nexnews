@@ -12,7 +12,7 @@ import { AdBanner } from '@/components/ads/AdBanner';
 import { TrendingSidebar } from '@/components/widgets/TrendingSidebar';
 import { NewsletterWidget } from '@/components/widgets/NewsletterWidget';
 import { ArticleActions } from '@/components/article/ArticleActions';
-import { Clock, Eye, Sparkles, ChevronLeft, Calendar, User, Tag } from 'lucide-react';
+import { Clock, Eye, ChevronLeft, Calendar, Tag } from 'lucide-react';
 
 interface ArticlePageProps {
   params: Promise<{
@@ -71,6 +71,30 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
   };
 }
 
+function extractFaqsFromContent(htmlContent: string): Array<{ question: string; answer: string }> {
+  const faqs: Array<{ question: string; answer: string }> = [];
+  if (!htmlContent) return faqs;
+
+  const h3Regex = /<h3[^>]*>(.*?)<\/h3>\s*<p[^>]*>(.*?)<\/p>/gi;
+  let match;
+  while ((match = h3Regex.exec(htmlContent)) !== null) {
+    const rawQuestion = match[1].replace(/<[^>]+>/g, '').trim();
+    const rawAnswer = match[2].replace(/<[^>]+>/g, '').trim();
+    if (
+      rawQuestion &&
+      rawAnswer &&
+      (rawQuestion.endsWith('?') ||
+        /^(what|how|why|when|where|who|is|are|can|will|should)/i.test(rawQuestion) ||
+        rawQuestion.toLowerCase().includes('faq') ||
+        rawQuestion.toLowerCase().includes('key question'))
+    ) {
+      faqs.push({ question: rawQuestion, answer: rawAnswer });
+    }
+  }
+
+  return faqs;
+}
+
 export default async function ArticleDetailPage({ params }: ArticlePageProps) {
   const resolvedParams = await params;
   const article = getArticleBySlug(resolvedParams.slug);
@@ -83,8 +107,65 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
     .filter(a => a.id !== article.id)
     .slice(0, 3);
 
+  const articleUrl = `https://nexnews-nu.vercel.app/news/${article.slug}`;
+  const faqs = extractFaqsFromContent(article.content);
+
+  const newsArticleSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'NewsArticle',
+    'mainEntityOfPage': {
+      '@type': 'WebPage',
+      '@id': articleUrl,
+    },
+    'headline': article.title,
+    'description': article.summary,
+    'image': [article.imageUrl],
+    'datePublished': article.publishedAt,
+    'dateModified': article.publishedAt,
+    'author': {
+      '@type': 'Person',
+      'name': article.author.name,
+    },
+    'publisher': {
+      '@type': 'Organization',
+      'name': 'Nexnews',
+      'url': 'https://nexnews-nu.vercel.app',
+      'logo': {
+        '@type': 'ImageObject',
+        'url': 'https://nexnews-nu.vercel.app/logo.png',
+      },
+    },
+    'articleSection': article.category,
+    'keywords': article.tags.join(', '),
+  };
+
+  const faqSchema = faqs.length > 0 ? {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    'mainEntity': faqs.map((faq) => ({
+      '@type': 'Question',
+      'name': faq.question,
+      'acceptedAnswer': {
+        '@type': 'Answer',
+        'text': faq.answer,
+      },
+    })),
+  } : null;
+
   return (
     <article className="space-y-8">
+      {/* JSON-LD Structured Data for Search & AI Engines */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(newsArticleSchema) }}
+      />
+      {faqSchema && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        />
+      )}
+
       {/* Breadcrumb Navigation */}
       <nav className="flex items-center gap-2 text-xs text-slate-500 font-medium">
         <Link href="/" className="hover:text-blue-600 transition-colors flex items-center gap-1">

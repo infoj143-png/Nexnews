@@ -2,38 +2,31 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Search, Sparkles, Menu, X, ShieldAlert, TrendingUp } from 'lucide-react';
-import { CATEGORIES, Article, getArticles } from '@/lib/data';
+import { Search, Menu, X } from 'lucide-react';
+import { CATEGORIES, getArticles } from '@/lib/data';
 
 export const Header: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<Article[]>([]);
+  const [isFocused, setIsFocused] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (searchQuery.trim().length > 1) {
-      const allArticles = getArticles();
-      const query = searchQuery.toLowerCase();
-      const filtered = allArticles.filter(
+  const query = searchQuery.trim().toLowerCase();
+  const searchResults = query.length > 1
+    ? getArticles().filter(
         a =>
           a.title.toLowerCase().includes(query) ||
           a.summary.toLowerCase().includes(query) ||
           a.category.toLowerCase().includes(query)
-      );
-      setSearchResults(filtered);
-      setIsSearching(true);
-    } else {
-      setSearchResults([]);
-      setIsSearching(false);
-    }
-  }, [searchQuery]);
+      )
+    : [];
+
+  const showSearchResults = isFocused && query.length > 1;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-        setIsSearching(false);
+        setIsFocused(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -89,13 +82,13 @@ export const Header: React.FC = () => {
               placeholder="Search breaking news, AI updates, market trends..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => searchQuery.trim().length > 1 && setIsSearching(true)}
+              onFocus={() => setIsFocused(true)}
               className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full text-sm text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-all"
             />
           </div>
 
           {/* Search Dropdown Results */}
-          {isSearching && (
+          {showSearchResults && (
             <div className="absolute left-0 right-0 top-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl z-50 overflow-hidden max-h-96 overflow-y-auto">
               {searchResults.length > 0 ? (
                 <div className="p-2 divide-y divide-slate-100 dark:divide-slate-800">
@@ -106,7 +99,7 @@ export const Header: React.FC = () => {
                     <Link
                       key={item.id}
                       href={`/news/${item.slug}`}
-                      onClick={() => setIsSearching(false)}
+                      onClick={() => setIsFocused(false)}
                       className="block p-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 rounded-xl transition-colors"
                     >
                       <div className="flex items-center gap-2 mb-1">

@@ -1,0 +1,18 @@
+# Nexnews
+
+> Autonomous AI-Powered Global News & Search Trend Portal
+
+Nexnews is an automated news and intelligence portal delivering real-time coverage across Technology, Artificial Intelligence, Business, World News, and Sports.
+
+## Core Features & Content
+- Real-time global trending search topic synthesis and analysis.
+- Structured news reporting covering Tech, World, Business, AI, and Sports.
+- Instant indexation and search-intent resolution.
+
+## Essential Links
+- Sitemap: https://nexnews-nu.vercel.app/sitemap.xml
+- Tech Coverage: https://nexnews-nu.vercel.app/category/tech
+- AI Coverage: https://nexnews-nu.vercel.app/category/ai
+- Business Coverage: https://nexnews-nu.vercel.app/category/business
+- World Coverage: https://nexnews-nu.vercel.app/category/world
+- Sports Coverage: https://nexnews-nu.vercel.app/category/sports
