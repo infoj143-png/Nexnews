@@ -3,6 +3,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getArticleBySlug, getArticles, getArticlesByCategory } from '@/lib/data';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 export const dynamic = 'force-dynamic';
 export const dynamicParams = true;
@@ -168,7 +169,7 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
           {/* HTML Article Content */}
           <div
             className="prose dark:prose-invert max-w-none text-slate-800 dark:text-slate-200 text-base leading-relaxed space-y-4"
-            dangerouslySetInnerHTML={{ __html: article.content }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(article.content) }}
           />
 
           {/* Tags */}

@@ -1,13 +1,18 @@
 import { NextResponse } from 'next/server';
 import { addArticle, Category, slugify } from '@/lib/data';
+import { requireAdminAuth } from '@/lib/auth';
 
 export async function POST(request: Request) {
+  const auth = requireAdminAuth(request);
+  if (!auth.authenticated) {
+    return auth.errorResponse!;
+  }
+
   try {
     const body = await request.json();
     const topic = body.topic || 'Breakthrough in AI and Automated Technology Systems';
     const category: Category = body.category || 'AI';
 
-    // Simulate AI synthesis pipeline (OpenAI/Anthropic integration template)
     const title = topic.length > 10 && !topic.includes('\n')
       ? topic
       : `AI Synthesis Report: ${topic}`;
