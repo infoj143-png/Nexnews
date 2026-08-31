@@ -2,27 +2,28 @@
 """
 Nexnews Autonomous Background News Generation Script
 -----------------------------------------------------
-Fetches trending news keywords/topics (targeting Pakistan and Global regions),
+Fetches trending news keywords/topics from worldwide Google Trends RSS feeds,
+ranks candidate items by worldwide search traffic, deduplicates against recently published articles,
 generates an SEO/GEO-optimized news article using an LLM API (Gemini / OpenAI),
-and writes the structured article JSON directly to data/articles/<slug>.json.
+sanitizes HTML output, and writes structured article JSON to data/articles/<slug>.json.
+Submits new URLs to Google Indexing API upon publication.
 """
 
 import os
 import sys
 import json
 import re
-import random
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import urllib.request
 import urllib.parse
 import xml.etree.ElementTree as ET
 
-import requests
 from google.oauth2 import service_account
 from google.auth.transport.requests import AuthorizedSession
 
-# Category image fallbacks (Unsplash)
+VALID_CATEGORIES = ["Tech", "World", "Business", "AI", "Sports"]
+
 CATEGORY_IMAGES = {
     "AI": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80",
     "Tech": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
@@ -31,20 +32,10 @@ CATEGORY_IMAGES = {
     "Sports": "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80"
 }
 
-VALID_CATEGORIES = ["Tech", "World", "Business", "AI", "Sports"]
+# Supported Google Trends GEO codes for broad worldwide coverage
+GOOGLE_TRENDS_GEOS = ["US", "GB", "IN", "PK", "CA", "AU", "AE", "SA", "DE", "FR", "JP", "BR", "MX"]
 
-# RSS feeds targeting Pakistan & Global topics
-TRENDING_FEEDS = [
-    {
-        "url": "https://trends.google.com/trending/rss?geo=PK",
-        "source": "Google Trends Pakistan",
-        "default_category": "World"
-    },
-    {
-        "url": "https://trends.google.com/trending/rss?geo=US",
-        "source": "Google Trends Global",
-        "default_category": "Tech"
-    },
+NON_TREND_FEEDS = [
     {
         "url": "https://techcrunch.com/feed/",
         "source": "TechCrunch",
@@ -62,40 +53,6 @@ TRENDING_FEEDS = [
     }
 ]
 
-# Fallback topics (targeting Pakistan & Global trends) if RSS feeds fail
-FALLBACK_TOPICS = [
-    {
-        "title": "Pakistan Tech Ecosystem Accelerates Growth in AI and Cloud Infrastructure",
-        "description": "Local IT sector sees surging export revenues and foreign investment in AI research and software engineering infrastructure.",
-        "category": "Tech",
-        "source": "Nexnews Trend Radar (Pakistan)"
-    },
-    {
-        "title": "Autonomous AI Agents Revolutionize Global Enterprise Software Development",
-        "description": "Next-generation reasoning models are automatically managing codebases, running regression tests, and deploying cloud infrastructure.",
-        "category": "AI",
-        "source": "Nexnews Trend Radar"
-    },
-    {
-        "title": "Global Renewable Energy Grid Surpasses 60% Total Capacity Threshold",
-        "description": "Solid-state battery storage grid deployments accelerate transition to net-zero power networks in major metropolitan areas.",
-        "category": "World",
-        "source": "Nexnews Trend Radar"
-    },
-    {
-        "title": "State Bank of Pakistan Integrates New Digital Currency Settlement Protocols",
-        "description": "Financial institutions roll out real-time cross-border payment settlements using digital currency infrastructure.",
-        "category": "Business",
-        "source": "Nexnews Trend Radar (Pakistan)"
-    },
-    {
-        "title": "Pakistan Super League Introduces AI Bio-Tracking Sensors for Player Recovery",
-        "description": "Sports science departments adopt real-time biometric analysis to optimize athletic recovery speed during tournament matches.",
-        "category": "Sports",
-        "source": "Nexnews Trend Radar (Pakistan)"
-    }
-]
-
 def slugify(text: str) -> str:
     """Converts a title into a URL-friendly slug."""
     text = text.lower()
@@ -103,36 +60,56 @@ def slugify(text: str) -> str:
     text = re.sub(r'[\s_-]+', '-', text)
     return text.strip('-')
 
-def fetch_trending_topic() -> dict:
-    """Fetches real-time search keywords and news headlines from Google Trends RSS or news feeds."""
-    random_feeds = list(TRENDING_FEEDS)
-    random.shuffle(random_feeds)
+def parse_approx_traffic(traffic_str: str) -> int:
+    """Parses traffic strings like '1M+', '200K+', '50K+' into numerical values for ranking."""
+    if not traffic_str:
+        return 0
+    clean = traffic_str.upper().replace('+', '').replace(',', '').strip()
+    try:
+        if 'M' in clean:
+            num = float(clean.replace('M', ''))
+            return int(num * 1_000_000)
+        elif 'K' in clean:
+            num = float(clean.replace('K', ''))
+            return int(num * 1_000)
+        return int(float(clean))
+    except ValueError:
+        return 0
 
+def fetch_worldwide_candidates() -> list:
+    """
+    Fetches Google Trends RSS feeds from all configured worldwide GEOs,
+    extracts traffic metrics, ranks them descending by volume,
+    and appends non-trend feeds as lower-tier candidates.
+    """
+    candidates = []
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Nexnews-AutoNews/1.0"}
     ns = {'ht': 'https://trends.google.com/trending/rss'}
 
-    for feed in random_feeds:
+    # 1. Fetch Google Trends RSS across worldwide GEOs
+    for geo in GOOGLE_TRENDS_GEOS:
+        feed_url = f"https://trends.google.com/trending/rss?geo={geo}"
+        source_name = f"Google Trends ({geo})"
         try:
-            req = urllib.request.Request(feed["url"], headers=headers)
-            with urllib.request.urlopen(req, timeout=8) as response:
+            req = urllib.request.Request(feed_url, headers=headers)
+            with urllib.request.urlopen(req, timeout=6) as response:
                 if response.status == 200:
                     xml_data = response.read().decode('utf-8', errors='ignore')
                     root = ET.fromstring(xml_data)
                     items = root.findall('.//item')
-                    if items:
-                        selected_item = random.choice(items[:5])
-                        title_elem = selected_item.find('title')
-                        desc_elem = selected_item.find('description')
+
+                    for item in items:
+                        title_elem = item.find('title')
+                        desc_elem = item.find('description')
 
                         raw_keyword = title_elem.text.strip() if title_elem is not None and title_elem.text else ""
                         desc = desc_elem.text.strip() if desc_elem is not None and desc_elem.text else ""
                         desc = re.sub(r'<[^>]+>', '', desc)
 
-                        # Extract Google Trends specific namespace elements
-                        traffic_elem = selected_item.find('ht:approx_traffic', ns)
+                        traffic_elem = item.find('ht:approx_traffic', ns)
                         approx_traffic = traffic_elem.text.strip() if traffic_elem is not None and traffic_elem.text else ""
 
-                        news_item = selected_item.find('ht:news_item', ns)
+                        news_item = item.find('ht:news_item', ns)
                         news_headline = ""
                         news_source = ""
                         news_snippet = ""
@@ -153,42 +130,143 @@ def fetch_trending_topic() -> dict:
                             if ht_url is not None and ht_url.text:
                                 news_url = ht_url.text.strip()
 
-                        source_name = news_source or feed["source"]
                         trending_keyword = raw_keyword or news_headline
                         description = news_snippet or desc or news_headline or raw_keyword
-
-                        # Construct article title context
-                        if news_headline:
-                            title = news_headline
-                        elif raw_keyword:
-                            title = f"Trending Search Analysis: {raw_keyword.title()}"
-                        else:
-                            title = ""
+                        title = news_headline or (f"Trending Search Analysis: {raw_keyword.title()}" if raw_keyword else "")
 
                         if title and len(title) > 3:
-                            print(f"[+] Fetched trending topic from {feed['source']}: '{trending_keyword}' ({approx_traffic} searches)")
-                            return {
+                            traffic_num = parse_approx_traffic(approx_traffic)
+                            candidates.append({
                                 "title": title,
                                 "trending_keyword": trending_keyword,
                                 "approx_traffic": approx_traffic or "High Search Volume",
+                                "traffic_num": traffic_num,
                                 "headline": news_headline or title,
                                 "description": description,
-                                "category": feed["default_category"],
-                                "source": source_name,
-                                "url": news_url
-                            }
+                                "category": "Tech",
+                                "source": news_source or source_name,
+                                "url": news_url,
+                                "tier": 1
+                            })
         except Exception as e:
-            print(f"[-] Could not fetch feed {feed['source']}: {e}")
-            continue
+            print(f"[-] Could not fetch Google Trends RSS ({geo}): {e}")
 
-    # Use fallback topic if RSS fetch fails
-    selected = random.choice(FALLBACK_TOPICS)
-    fallback_keyword = selected.get("trending_keyword", selected["title"].split(":")[0])
-    selected["trending_keyword"] = fallback_keyword
-    selected["approx_traffic"] = "100K+ Search Volume"
-    selected["headline"] = selected["title"]
-    print(f"[!] Using fallback trending topic: '{selected['title']}'")
-    return selected
+    # Deduplicate candidates by trending_keyword / headline before sorting
+    unique_candidates = []
+    seen_keywords = set()
+
+    # Sort Google Trends candidates by traffic score (highest first)
+    candidates.sort(key=lambda x: x["traffic_num"], reverse=True)
+
+    for c in candidates:
+        key = slugify(c["trending_keyword"])
+        if key and key not in seen_keywords:
+            seen_keywords.add(key)
+            unique_candidates.append(c)
+
+    # 2. Append non-trend RSS feeds as Tier 2 fallbacks
+    for feed in NON_TREND_FEEDS:
+        try:
+            req = urllib.request.Request(feed["url"], headers=headers)
+            with urllib.request.urlopen(req, timeout=6) as response:
+                if response.status == 200:
+                    xml_data = response.read().decode('utf-8', errors='ignore')
+                    root = ET.fromstring(xml_data)
+                    items = root.findall('.//item')
+                    for item in items[:3]:
+                        title_elem = item.find('title')
+                        desc_elem = item.find('description')
+                        link_elem = item.find('link')
+
+                        t = title_elem.text.strip() if title_elem is not None and title_elem.text else ""
+                        d = desc_elem.text.strip() if desc_elem is not None and desc_elem.text else ""
+                        d = re.sub(r'<[^>]+>', '', d)
+                        l = link_elem.text.strip() if link_elem is not None and link_elem.text else ""
+
+                        if t and len(t) > 3:
+                            key = slugify(t)
+                            if key not in seen_keywords:
+                                seen_keywords.add(key)
+                                unique_candidates.append({
+                                    "title": t,
+                                    "trending_keyword": t,
+                                    "approx_traffic": "General News Feed",
+                                    "traffic_num": 0,
+                                    "headline": t,
+                                    "description": d or t,
+                                    "category": feed["default_category"],
+                                    "source": feed["source"],
+                                    "url": l,
+                                    "tier": 2
+                                })
+        except Exception as e:
+            print(f"[-] Could not fetch non-trend feed {feed['source']}: {e}")
+
+    return unique_candidates
+
+def get_recent_published_topics(articles_dir: str) -> set:
+    """Reads existing article JSON files published within the last 72 hours to build a duplicate-check set."""
+    recent_slugs_and_titles = set()
+    if not os.path.exists(articles_dir):
+        return recent_slugs_and_titles
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=72)
+
+    for filename in os.listdir(articles_dir):
+        if filename.endswith(".json"):
+            filepath = os.path.join(articles_dir, filename)
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    pub_str = data.get("publishedAt", "")
+                    # Parse published date if present
+                    if pub_str:
+                        try:
+                            pub_dt = datetime.fromisoformat(pub_str.replace("Z", "+00:00"))
+                            if pub_dt < cutoff:
+                                continue
+                        except Exception:
+                            pass
+
+                    title = data.get("title", "")
+                    slug = data.get("slug", "")
+                    if slug:
+                        recent_slugs_and_titles.add(slug.lower())
+                    if title:
+                        recent_slugs_and_titles.add(slugify(title))
+            except Exception:
+                continue
+
+    return recent_slugs_and_titles
+
+def is_duplicate_candidate(candidate: dict, recent_topics: set) -> bool:
+    """Checks if a candidate is a duplicate of recently published articles."""
+    cand_slug = slugify(candidate["title"])
+    kw_slug = slugify(candidate["trending_keyword"])
+
+    if cand_slug in recent_topics or kw_slug in recent_topics:
+        return True
+
+    # Check substring / word overlap with recent topics
+    for recent in recent_topics:
+        if len(recent) > 5 and (recent in cand_slug or cand_slug in recent):
+            return True
+        if len(kw_slug) > 5 and (kw_slug in recent or recent in kw_slug):
+            return True
+
+    return False
+
+def sanitize_article_content(html_str: str) -> str:
+    """Sanitizes HTML content server-side by stripping scripts, style tags, and inline event handlers."""
+    if not html_str:
+        return ""
+    # Strip script and style blocks
+    clean = re.sub(r'<(script|style)[^>]*>[\s\S]*?</\1>', '', html_str, flags=re.IGNORECASE)
+    # Strip inline event handlers (onerror=, onclick=, etc.)
+    clean = re.sub(r'\s+on[a-z]+\s*=\s*(("[^"]*")|(\'[^\']*\')|([^\s>]+))', '', clean, flags=re.IGNORECASE)
+    # Strip javascript: URLs
+    clean = re.sub(r'href\s*=\s*["\']?\s*javascript:[^"\' >]*["\']?', 'href="#"', clean, flags=re.IGNORECASE)
+    return clean
 
 def generate_article_gemini(topic: dict, api_key: str) -> dict:
     """Generates an SEO/GEO optimized article centered around high-demand search intent using Google Gemini API."""
@@ -207,7 +285,6 @@ ESTIMATED SEARCH DEMAND: "{traffic}"
 BREAKING HEADLINE / CONTEXT: "{headline}"
 SOURCE DISPATCH: "{topic.get('source', 'Nexnews Trend Radar')}"
 SUMMARY CONTEXT: "{topic.get('description', '')}"
-TARGET CATEGORY: "{topic.get('category', 'Tech')}"
 
 ### SEARCH INTENT & SEO / GEO OPTIMIZATION MANDATES:
 1. Search Keyword Targeting: The main title and opening paragraph must seamlessly integrate the high-demand keyword "{trending_kw}" to capture maximum organic search traffic.
@@ -215,7 +292,8 @@ TARGET CATEGORY: "{topic.get('category', 'Tech')}"
 3. Structural Hierarchy: Use clear <h2> and <h3> HTML tags for clean scanning and search engine indexing.
 4. Key Takeaways & Metrics: Include a bulleted <ul> list with concrete statistics, quantitative metrics, or key event timeline points.
 5. High-Intent FAQ Section: Include a "Key Questions Answered" or FAQ section using <h3> headings that answer long-tail search questions users ask about "{trending_kw}".
-6. HTML Formatting Standards: Wrap paragraphs in <p class="mb-4">, main sections in <h2 class="text-2xl font-bold mt-6 mb-3">, sub-headings in <h3 class="text-xl font-semibold mt-4 mb-2">, lists in <ul class="list-disc pl-6 my-4 space-y-2">, and blockquotes in <blockquote class="border-l-4 border-blue-600 pl-4 my-6 italic text-slate-700 dark:text-slate-300 font-serif">.
+6. Category Classification: Classify the article into exactly one of these categories: "Tech", "World", "Business", "AI", "Sports" based on the headline/content.
+7. HTML Formatting Standards: Wrap paragraphs in <p class="mb-4">, main sections in <h2 class="text-2xl font-bold mt-6 mb-3">, sub-headings in <h3 class="text-xl font-semibold mt-4 mb-2">, lists in <ul class="list-disc pl-6 my-4 space-y-2">, and blockquotes in <blockquote class="border-l-4 border-blue-600 pl-4 my-6 italic text-slate-700 dark:text-slate-300 font-serif">.
 
 Return ONLY a valid JSON object matching this schema:
 {{
@@ -245,12 +323,12 @@ Return ONLY a valid JSON object matching this schema:
         res_data = json.loads(response.read().decode('utf-8'))
         raw_text = res_data["candidates"][0]["content"]["parts"][0]["text"]
 
-        # Clean JSON block wrapper if present
         raw_text = re.sub(r'^```json\s*', '', raw_text, flags=re.MULTILINE)
         raw_text = re.sub(r'^```\s*', '', raw_text, flags=re.MULTILINE)
         raw_text = re.sub(r'\s*```$', '', raw_text, flags=re.MULTILINE)
 
-        return json.loads(raw_text.strip())
+        parsed = json.loads(raw_text.strip())
+        return parsed
 
 def generate_article_openai(topic: dict, api_key: str) -> dict:
     """Generates an SEO/GEO optimized article using OpenAI API."""
@@ -264,9 +342,9 @@ TRENDING KEYWORD: "{trending_kw}"
 HEADLINE: "{topic.get('headline') or topic['title']}"
 SOURCE: "{topic['source']}"
 DESCRIPTION: "{topic['description']}"
-SUGGESTED CATEGORY: "{topic['category']}"
 
 Optimize title and content to resolve user search intent for "{trending_kw}".
+Classify category as one of: Tech, World, Business, AI, Sports.
 Include h2, h3 FAQ sections, p, ul with stats, and blockquotes.
 
 Return ONLY a valid JSON object:
@@ -300,95 +378,86 @@ Return ONLY a valid JSON object:
         raw_text = res_data["choices"][0]["message"]["content"]
         return json.loads(raw_text.strip())
 
-def generate_fallback_article(topic: dict) -> dict:
-    """Generates a structured GEO fallback article when LLM API keys are absent or fail."""
-    trending_kw = topic.get("trending_keyword") or topic.get("title")
-    headline = topic.get("headline") or topic.get("title")
-    title = headline if headline else f"Trending Search Analysis: {trending_kw}"
-    cat = topic["category"] if topic.get("category") in VALID_CATEGORIES else "Tech"
-    slug = slugify(title)
-    traffic = topic.get("approx_traffic") or "High Search Volume"
-    summary = f"High-demand search trend analysis for '{trending_kw}' ({traffic}): Key developments, analysis, and strategic breakdown."
-
-    content = f"""
-<p class="mb-4 font-serif text-lg leading-relaxed"><strong>AUTOMATED AI SEARCH TREND REPORT</strong> — Real-time search engine telemetry confirms surging query volumes for <strong>"{trending_kw}"</strong> ({traffic}). This special dispatch analyzes breaking news developments, underlying market forces, and search intent indicators behind this trend.</p>
-
-<h2 class="text-2xl font-bold mt-6 mb-3">Breaking Overview & Search Intent Metrics</h2>
-<p class="mb-4">Digital intelligence networks report heightened interest across regional and global digital platforms regarding <strong>{title}</strong>.</p>
-
-<ul class="list-disc pl-6 my-4 space-y-2">
-  <li><strong>Search Volume Velocity:</strong> Registered {traffic} in real-time search queries across primary search indices.</li>
-  <li><strong>Key Focus Area:</strong> {topic.get('description', title)}</li>
-  <li><strong>Market Sentiment:</strong> Positive engagement and rapid indexation across leading digital media channels.</li>
-  <li><strong>Regional & Global Reach:</strong> Sourced via {topic.get('source', 'Nexnews Trend Radar')}.</li>
-</ul>
-
-<blockquote class="border-l-4 border-blue-600 pl-4 my-6 italic text-slate-700 dark:text-slate-300 font-serif">
-  "Aligning real-time search intent with Generative Engine Optimization ensures immediate content relevance and authority for high-demand topics."
-</blockquote>
-
-<h2 class="text-2xl font-bold mt-6 mb-3">Key Questions Answered (Search Query Resolution)</h2>
-
-<h3 class="text-xl font-semibold mt-4 mb-2">Why is "{trending_kw}" trending right now?</h3>
-<p class="mb-4">Surging interest in "{trending_kw}" is driven by breaking developments reported by {topic.get('source', 'major news outlets')}, highlighting significant shifts and immediate user interest.</p>
-
-<h3 class="text-xl font-semibold mt-4 mb-2">What are the primary takeaways for readers?</h3>
-<p class="mb-4">This trending event underscores key industry changes, offering crucial insights for audience members tracking real-time updates and strategic market analysis.</p>
-
-<h2 class="text-2xl font-bold mt-6 mb-3">Future Outlook & Ongoing Coverage</h2>
-<p class="mb-4">Nexnews will continue tracking real-time telemetry and search demand patterns for "{trending_kw}" as further details unfold.</p>
-"""
-
-    return {
-        "title": title,
-        "slug": slug,
-        "category": cat,
-        "summary": summary,
-        "content": content,
-        "tags": [cat, trending_kw, "Trending-Search", "Breaking-News", "SEO-Optimized"]
-    }
-
 def main():
     print("==================================================")
-    print("  Nexnews Autonomous News Generator Pipeline  ")
+    print("  Nexnews Worldwide Autonomous News Generator     ")
     print("==================================================")
 
     gemini_key = os.environ.get("GEMINI_API_KEY")
     openai_key = os.environ.get("OPENAI_API_KEY")
 
-    topic = fetch_trending_topic()
-    article_data = None
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    articles_dir = os.path.join(repo_root, "data", "articles")
+    os.makedirs(articles_dir, exist_ok=True)
 
-    if gemini_key:
-        print("[+] Generating article via Gemini API...")
-        try:
-            article_data = generate_article_gemini(topic, gemini_key)
-        except Exception as e:
-            print(f"[-] Gemini API generation error: {e}")
+    print("[+] Fetching worldwide candidate pool from Google Trends RSS...")
+    candidates = fetch_worldwide_candidates()
 
-    if not article_data and openai_key:
-        print("[+] Generating article via OpenAI API...")
-        try:
-            article_data = generate_article_openai(topic, openai_key)
-        except Exception as e:
-            print(f"[-] OpenAI API generation error: {e}")
+    if not candidates:
+        print("[-] Genuine total fetch failure: No candidates retrieved across worldwide RSS feeds. Skipping run.")
+        sys.exit(0)
 
-    if not article_data:
-        print("[!] API keys not found or API requests failed. Generating fallback GEO news article...")
-        article_data = generate_fallback_article(topic)
+    print(f"[+] Total worldwide candidates fetched & ranked: {len(candidates)}")
 
-    # Validate category & slug
-    cat = article_data.get("category")
+    recent_topics = get_recent_published_topics(articles_dir)
+    print(f"[+] Found {len(recent_topics)} recently published topic keys for duplicate check.")
+
+    selected_topic = None
+    generated_article_data = None
+
+    # Fall through candidate list to find top non-duplicate item and generate article
+    for idx, candidate in enumerate(candidates):
+        print(f"[*] Checking candidate #{idx+1}: '{candidate['trending_keyword']}' ({candidate['approx_traffic']}) from {candidate['source']}")
+
+        if is_duplicate_candidate(candidate, recent_topics):
+            print(f"  [-] Candidate '{candidate['trending_keyword']}' is a near-duplicate of recent publication. Falling through...")
+            continue
+
+        print(f"  [+] Candidate accepted: '{candidate['trending_keyword']}'. Triggering AI generation...")
+
+        article_data = None
+        if gemini_key:
+            try:
+                article_data = generate_article_gemini(candidate, gemini_key)
+            except Exception as e:
+                print(f"  [-] Gemini generation error for candidate: {e}")
+
+        if not article_data and openai_key:
+            try:
+                article_data = generate_article_openai(candidate, openai_key)
+            except Exception as e:
+                print(f"  [-] OpenAI generation error for candidate: {e}")
+
+        # Defensive validation of LLM response
+        if article_data and isinstance(article_data, dict):
+            content = article_data.get("content", "").strip()
+            title = article_data.get("title", "").strip()
+
+            if content and title:
+                selected_topic = candidate
+                generated_article_data = article_data
+                print(f"  [SUCCESS] Successfully generated article: '{title}'")
+                break
+            else:
+                print("  [-] LLM returned missing/empty content or title. Treating as candidate failure and falling through...")
+
+    if not generated_article_data or not selected_topic:
+        print("[-] Skipping run: All candidate items were either duplicates or failed AI content generation.")
+        sys.exit(0)
+
+    # Validate category from LLM response (Gemini JSON response is source of truth)
+    cat = generated_article_data.get("category")
     if cat not in VALID_CATEGORIES:
-        cat = topic.get("category", "Tech")
+        cat = selected_topic.get("category")
         if cat not in VALID_CATEGORIES:
             cat = "Tech"
 
-    slug = slugify(article_data.get("slug") or article_data.get("title") or topic["title"])
-    title = article_data.get("title", topic["title"])
-    summary = article_data.get("summary", topic["description"])
-    content = article_data.get("content", "")
-    tags = article_data.get("tags", [cat, "News", "AI-Generated"])
+    slug = slugify(generated_article_data.get("slug") or generated_article_data.get("title") or selected_topic["title"])
+    title = generated_article_data.get("title", selected_topic["title"])
+    summary = generated_article_data.get("summary", selected_topic["description"])
+    raw_content = generated_article_data.get("content", "")
+    content = sanitize_article_content(raw_content)
+    tags = generated_article_data.get("tags", [cat, "News", "AI-Generated"])
 
     published_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     article_id = str(int(time.time() * 1000))
@@ -418,11 +487,6 @@ def main():
         "aiGenerated": True
     }
 
-    # Ensure data/articles directory exists
-    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    articles_dir = os.path.join(repo_root, "data", "articles")
-    os.makedirs(articles_dir, exist_ok=True)
-
     file_path = os.path.join(articles_dir, f"{slug}.json")
     with open(file_path, "w", encoding="utf-8") as f:
         json.dump(full_article, f, indent=2, ensure_ascii=False)
@@ -431,6 +495,10 @@ def main():
     print(f" - Title: {title}")
     print(f" - Slug: {slug}")
     print(f" - Category: {cat}")
+
+    target_repo = os.environ.get("GITHUB_REPOSITORY")
+    if not target_repo and os.environ.get("CI"):
+        print("[-] GITHUB_REPOSITORY environment variable is not configured in CI environment.")
 
     # Automatically submit newly published article to Google Indexing API
     site_url = os.environ.get("SITE_URL", "https://nexnews-nu.vercel.app").rstrip("/")

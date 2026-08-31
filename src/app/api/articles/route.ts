@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getArticles, addArticle, deleteArticle, updateArticle, searchArticles, getAnalytics } from '@/lib/data';
+import { getArticles, addArticle, deleteArticle, searchArticles, getAnalytics } from '@/lib/data';
+import { requireAdminAuth } from '@/lib/auth';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -27,6 +28,11 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const auth = requireAdminAuth(request);
+  if (!auth.authenticated) {
+    return auth.errorResponse!;
+  }
+
   try {
     const body = await request.json();
 
@@ -73,6 +79,11 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const auth = requireAdminAuth(request);
+  if (!auth.authenticated) {
+    return auth.errorResponse!;
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
+import { signAdminToken, COOKIE_NAME } from '@/lib/auth';
 
 export async function POST(request: Request) {
   try {
     const { password } = await request.json();
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
 
     if (!password) {
       return NextResponse.json(
@@ -12,13 +13,46 @@ export async function POST(request: Request) {
       );
     }
 
-    if (password === adminPassword) {
-      // In a real session system, we'd issue a signed JWT or session token.
-      // Here we return a simple authentication token or flag.
-      return NextResponse.json({
+    const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
+    const adminPasswordPlain = process.env.ADMIN_PASSWORD;
+
+    if (!adminPasswordHash && !adminPasswordPlain) {
+      console.error('[CRITICAL SECURITY ERROR] Neither ADMIN_PASSWORD nor ADMIN_PASSWORD_HASH environment variable is configured on server.');
+      return NextResponse.json(
+        { success: false, error: 'Server authentication configuration error. Admin access is disabled until configured.' },
+        { status: 500 }
+      );
+    }
+
+    let isValid = false;
+
+    if (adminPasswordHash) {
+      isValid = await bcrypt.compare(password, adminPasswordHash);
+    } else if (adminPasswordPlain) {
+      isValid = password === adminPasswordPlain;
+    }
+
+    if (isValid) {
+      const token = signAdminToken();
+      const isProduction = process.env.NODE_ENV === 'production';
+
+      const response = NextResponse.json({
         success: true,
-        token: 'nexnews_admin_authenticated_session'
+        message: 'Admin authenticated successfully'
       });
+
+      // Set httpOnly, Secure, SameSite=strict cookie
+      response.cookies.set({
+        name: COOKIE_NAME,
+        value: token,
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: 'strict',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60 // 7 days in seconds
+      });
+
+      return response;
     }
 
     return NextResponse.json(

@@ -285,9 +285,13 @@ export function searchArticles(query: string): Article[] {
   );
 }
 
+import { sanitizeHtml } from './sanitize';
+
 export function addArticle(article: Omit<Article, 'id' | 'views'>): Article {
+  const sanitizedContent = sanitizeHtml(article.content);
   const newArticle: Article = {
     ...article,
+    content: sanitizedContent,
     id: Date.now().toString(),
     views: 0,
   };

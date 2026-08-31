@@ -49,13 +49,22 @@ export default function AdminDashboardPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const auth = sessionStorage.getItem('nexnews_admin_auth');
-      if (auth === 'true') {
+  const checkAuthSession = async () => {
+    try {
+      const res = await fetch('/api/admin/me');
+      const data = await res.json();
+      if (data.success && data.authenticated) {
         setIsAuthenticated(true);
+      } else {
+        setIsAuthenticated(false);
       }
+    } catch {
+      setIsAuthenticated(false);
     }
+  };
+
+  useEffect(() => {
+    checkAuthSession();
   }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -72,9 +81,9 @@ export default function AdminDashboardPage() {
       const data = await res.json();
 
       if (data.success) {
-        sessionStorage.setItem('nexnews_admin_auth', 'true');
         setIsAuthenticated(true);
         setPasswordInput('');
+        fetchArticles();
       } else {
         setLoginError(data.error || 'Invalid admin password');
       }
@@ -85,9 +94,14 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('nexnews_admin_auth');
-    setIsAuthenticated(false);
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/logout', { method: 'POST' });
+    } catch (err) {
+      console.error('Logout request error:', err);
+    } finally {
+      setIsAuthenticated(false);
+    }
   };
 
   // AI Generator Form state
@@ -533,7 +547,7 @@ export default function AdminDashboardPage() {
                 </p>
                 <div className="space-y-2 text-xs">
                   <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60">
-                    <span className="text-slate-600 dark:text-slate-400 font-medium">Vercel Cron Routine (/api/cron/auto-news)</span>
+                    <span className="text-slate-600 dark:text-slate-400 font-medium">GitHub Actions Pipeline (scripts/auto_news.py)</span>
                     <span className="text-emerald-500 font-bold flex items-center gap-1">
                       <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" /> Active
                     </span>
@@ -922,7 +936,7 @@ export default function AdminDashboardPage() {
                 Cron Execution Logs
               </h3>
               <p className="text-xs text-slate-400 mt-1">
-                In-database execution audit trail for /api/cron/auto-news without requiring paid Vercel logs.
+                Execution audit trail for autonomous content generation runs.
               </p>
             </div>
 
@@ -1035,7 +1049,7 @@ export default function AdminDashboardPage() {
                 {cronLogs.length === 0 && (
                   <tr>
                     <td colSpan={4} className="p-8 text-center text-slate-400 text-xs">
-                      No cron log entries recorded yet. Runs of /api/cron/auto-news will automatically record entries here.
+                      No cron log entries recorded yet. Runs of background automation pipelines will record entries here.
                     </td>
                   </tr>
                 )}
