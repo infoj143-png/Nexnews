@@ -23,15 +23,15 @@ export default function HomePage() {
       .catch(err => console.error('Error fetching articles:', err));
   }, []);
 
-  const featuredArticles = articles.filter(a => a.isFeatured).slice(0, 3);
-  const heroArticle = featuredArticles[0] || articles[0];
-  const subFeatured = featuredArticles.slice(1);
+  const sortedArticles = [...articles].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+  const heroArticle = sortedArticles[0];
+  const subFeatured = sortedArticles.slice(1, 3);
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   const filteredFeed = selectedCategory === 'all'
-    ? articles
-    : articles.filter(a => a.category.toLowerCase() === selectedCategory.toLowerCase());
+    ? sortedArticles
+    : sortedArticles.filter(a => a.category.toLowerCase() === selectedCategory.toLowerCase());
 
   return (
     <div className="space-y-8">
