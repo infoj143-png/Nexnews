@@ -305,12 +305,16 @@ export function loadFileSystemArticles(): Article[] {
 }
 
 // Helper functions to manage state in memory and filesystem
-export function getArticles(): Article[] {
+export function getAllArticles(): Article[] {
   const fsArticles = loadFileSystemArticles();
   const fsSlugs = new Set(fsArticles.map(a => a.slug));
   const memoryOnly = initialArticles.filter(a => !fsSlugs.has(a.slug));
-  // Combine filesystem articles (newer first) with initial memory articles
-  return [...fsArticles, ...memoryOnly];
+  const combined = [...fsArticles, ...memoryOnly];
+  return combined.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+}
+
+export function getArticles(): Article[] {
+  return getAllArticles();
 }
 
 export function getArticleBySlug(slug: string): Article | undefined {

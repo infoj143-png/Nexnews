@@ -5,14 +5,16 @@
 ▲ Next.js 16.3.3 (Turbopack)
 - Local:         http://localhost:3000
 - Network:       http://192.168.0.2:3000
-✓ Ready in 588ms
-✓ Running next.config.ts took 48ms
+✓ Ready in 545ms
+[@sentry/nextjs] Importing `withSentryConfig` from `@sentry/nextjs` is deprecated and will stop working in v11. Import it from `@sentry/nextjs/config` instead:
+  import { withSentryConfig } from '@sentry/nextjs/config';
+✓ Running next.config.ts took 724ms
+- Experiments (use with caution):
+  · clientTraceMetadata
 
- HEAD / 200 in 3.8s (next.js: 3.2s, application-code: 599ms)
- GET /news/next-generation-quantum-processors-break-quantum-supremacy-benchmarks 404 in 2.1s (next.js: 928ms, generate-params: 979ms, application-code: 169ms)
- GET /news/next-generation-quantum-processors-break-quantum-supremacy-benchmarks 404 in 148ms (next.js: 12ms, generate-params: 13ms, application-code: 123ms)
- GET /api/articles 200 in 558ms (next.js: 508ms, application-code: 50ms)
- GET /news/collapsed-glacier-likely-caused-devastating-nepal-tibet-floods-scientists-say 200 in 203ms (next.js: 5ms, generate-params: 16ms, application-code: 182ms)
+○ Compiling / ...
+ HEAD / 200 in 4.1s (next.js: 3.5s, application-code: 554ms)
+ GET / 200 in 248ms (next.js: 15ms, application-code: 234ms)
 [browser] Uncaught Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
 
 - A server/client branch `if (typeof window !== 'undefined')`.
@@ -26,265 +28,86 @@ It can also happen if the client has a browser extension installed which messes 
 https://react.dev/link/hydration-mismatch
 
   ...
-    <HTTPAccessFallbackErrorBoundary pathname="/news/coll..." notFound={<NotAllowedRootHTTPFallbackError>} ...>
-      <RedirectBoundary>
-        <RedirectErrorBoundary router={{...}}>
-          <Head>
-          <__next_root_layout_boundary__>
-            <SegmentViewNode type="layout" pagePath="src/layout...">
-              <SegmentTrieNode>
-              <link>
-              <script>
-              <script>
-              <RootLayout>
-                <html lang="en" className="h-full">
-                  <body className="min-h-full...">
-                    <Script>
-                    <Header>
-                    <BreakingTicker>
-                      <div className="bg-slate-9...">
-                        <div className="max-w-7xl ...">
-                          <div>
-                          <div className="relative o...">
-                            <div className="inline-fle...">
-                              <LinkComponent href="/news/open..." className="inline-fle...">
+    <DevRootHTTPAccessFallbackBoundary>
+      <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+        <HTTPAccessFallbackErrorBoundary pathname="/" notFound={<NotAllowedRootHTTPFallbackError>} forbidden={undefined} ...>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <Head>
+              <__next_root_layout_boundary__>
+                <SegmentViewNode type="layout" pagePath="src/layout...">
+                  <SegmentTrieNode>
+                  <link>
+                  <script>
+                  <script>
+                  <RootLayout>
+                    <html lang="en" className="h-full">
+                      <body className="min-h-full...">
+                        <Script>
+                        <Header>
+                          <header className="sticky top...">
+                            <div>
+                            <div className="max-w-7xl ...">
+                              <div>
+                              <div className="relative f..." ref={{current:null}}>
+                                <div className="relative">
+                                  <Search>
+                                  <input
+                                    type="text"
+                                    placeholder="Search breaking news, AI updates, market trends..."
+                                    value=""
+                                    onChange={function onChange}
+                                    onFocus={function onFocus}
+                                    className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-900 border border-sla..."
+-                                   style={{caret-color:"transparent"}}
+                                  >
+                              ...
+                            ...
+                        <BreakingTicker>
+                        <div>
+                        ...
+                          <div className="grid grid-...">
+                            <div className="lg:col-spa...">
+                              <LinkComponent href="/news/open..." className="block rela...">
                                 <a
-                                  className="inline-flex items-center gap-2 hover:text-blue-400 transition-colors group"
+                                  className="block relative overflow-hidden rounded-2xl bg-slate-900 border border-sla..."
                                   ref={function}
                                   onClick={function onClick}
                                   onMouseEnter={function onMouseEnter}
                                   onTouchStart={function onTouchStart}
 +                                 href="/news/openai-unveils-gpt-5-quantum-leap-reasoning"
--                                 href="/news/collapsed-glacier-likely-caused-devastating-nepal-tibet-floods-scientist..."
+-                                 href="/news/trending-search-analysis-my-parents-wont-lend-me-10k-but-helped-my-broth..."
                                 >
-                                  <span>
-                                  <span className="text-xs fo...">
-+                                   AI
--                                   World
+                                  <div className="relative h...">
+                                    <img
++                                     src={"https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&..."}
+-                                     src={"https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&..."}
++                                     alt="OpenAI Unveils GPT-5: A Quantum Leap in Autonomous Reasoning and Multimodal..."
+-                                     alt={"Trending Search Analysis: 'My Parents Won'T Lend Me £10K But Helped My Br..."}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform..."
+                                    >
+                                    <div>
+                                    <div className="absolute t...">
+                                      <span
+                                        className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-..."
+                                      >
++                                       AI
+-                                       Business
+                                      ...
                                     ...
-                                  ...
-                              ...
-                          ...
-                    ...
-          ...
+                            ...
+                        ...
+              ...
 
     at <unknown> (https://react.dev/link/hydration-mismatch)
     at span (<anonymous>)
-    at <unknown> (src/components/layout/BreakingTicker.tsx:33:17)
-    at Array.map (<anonymous>)
-    at BreakingTicker (src/components/layout/BreakingTicker.tsx:26:48)
-    at RootLayout (src/app/layout.tsx:46:9)
-  31 |               >
-  32 |                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 group-hover:bg-blue-400 transition-colors" />
-> 33 |                 <span className="text-xs font-bold text-red-400 uppercase tracking-wide">
-     |                 ^
-  34 |                   [{item.category}]
-  35 |                 </span>
-  36 |                 <span className="font-medium text-slate-200 group-hover:underline">
- GET /news/collapsed-glacier-likely-caused-devastating-nepal-tibet-floods-scientists-say 200 in 190ms (next.js: 5ms, generate-params: 15ms, application-code: 170ms)
-[browser] Uncaught Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
-
-- A server/client branch `if (typeof window !== 'undefined')`.
-- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
-- Date formatting in a user's locale which doesn't match the server.
-- External changing data without sending a snapshot of it along with the HTML.
-- Invalid HTML tag nesting.
-
-It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
-
-https://react.dev/link/hydration-mismatch
-
-  ...
-    <HTTPAccessFallbackErrorBoundary pathname="/news/coll..." notFound={<NotAllowedRootHTTPFallbackError>} ...>
-      <RedirectBoundary>
-        <RedirectErrorBoundary router={{...}}>
-          <Head>
-          <__next_root_layout_boundary__>
-            <SegmentViewNode type="layout" pagePath="src/layout...">
-              <SegmentTrieNode>
-              <link>
-              <script>
-              <script>
-              <RootLayout>
-                <html lang="en" className="h-full">
-                  <body className="min-h-full...">
-                    <Script>
-                    <Header>
-                    <BreakingTicker>
-                      <div className="bg-slate-9...">
-                        <div className="max-w-7xl ...">
-                          <div>
-                          <div className="relative o...">
-                            <div className="inline-fle...">
-                              <LinkComponent href="/news/open..." className="inline-fle...">
-                                <a
-                                  className="inline-flex items-center gap-2 hover:text-blue-400 transition-colors group"
-                                  ref={function}
-                                  onClick={function onClick}
-                                  onMouseEnter={function onMouseEnter}
-                                  onTouchStart={function onTouchStart}
-+                                 href="/news/openai-unveils-gpt-5-quantum-leap-reasoning"
--                                 href="/news/collapsed-glacier-likely-caused-devastating-nepal-tibet-floods-scientist..."
-                                >
-                                  <span>
-                                  <span className="text-xs fo...">
-+                                   AI
--                                   World
-                                    ...
-                                  ...
-                              ...
-                          ...
-                    ...
-          ...
-
-    at <unknown> (https://react.dev/link/hydration-mismatch)
-    at span (<anonymous>)
-    at <unknown> (src/components/layout/BreakingTicker.tsx:33:17)
-    at Array.map (<anonymous>)
-    at BreakingTicker (src/components/layout/BreakingTicker.tsx:26:48)
-    at RootLayout (src/app/layout.tsx:46:9)
-  31 |               >
-  32 |                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 group-hover:bg-blue-400 transition-colors" />
-> 33 |                 <span className="text-xs font-bold text-red-400 uppercase tracking-wide">
-     |                 ^
-  34 |                   [{item.category}]
-  35 |                 </span>
-  36 |                 <span className="font-medium text-slate-200 group-hover:underline">
- GET /news/collapsed-glacier-likely-caused-devastating-nepal-tibet-floods-scientists-say 200 in 165ms (next.js: 4ms, generate-params: 14ms, application-code: 148ms)
-[browser] Uncaught Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
-
-- A server/client branch `if (typeof window !== 'undefined')`.
-- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
-- Date formatting in a user's locale which doesn't match the server.
-- External changing data without sending a snapshot of it along with the HTML.
-- Invalid HTML tag nesting.
-
-It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
-
-https://react.dev/link/hydration-mismatch
-
-  ...
-    <HTTPAccessFallbackErrorBoundary pathname="/news/coll..." notFound={<NotAllowedRootHTTPFallbackError>} ...>
-      <RedirectBoundary>
-        <RedirectErrorBoundary router={{...}}>
-          <Head>
-          <__next_root_layout_boundary__>
-            <SegmentViewNode type="layout" pagePath="src/layout...">
-              <SegmentTrieNode>
-              <link>
-              <script>
-              <script>
-              <RootLayout>
-                <html lang="en" className="h-full">
-                  <body className="min-h-full...">
-                    <Script>
-                    <Header>
-                    <BreakingTicker>
-                      <div className="bg-slate-9...">
-                        <div className="max-w-7xl ...">
-                          <div>
-                          <div className="relative o...">
-                            <div className="inline-fle...">
-                              <LinkComponent href="/news/open..." className="inline-fle...">
-                                <a
-                                  className="inline-flex items-center gap-2 hover:text-blue-400 transition-colors group"
-                                  ref={function}
-                                  onClick={function onClick}
-                                  onMouseEnter={function onMouseEnter}
-                                  onTouchStart={function onTouchStart}
-+                                 href="/news/openai-unveils-gpt-5-quantum-leap-reasoning"
--                                 href="/news/collapsed-glacier-likely-caused-devastating-nepal-tibet-floods-scientist..."
-                                >
-                                  <span>
-                                  <span className="text-xs fo...">
-+                                   AI
--                                   World
-                                    ...
-                                  ...
-                              ...
-                          ...
-                    ...
-          ...
-
-    at <unknown> (https://react.dev/link/hydration-mismatch)
-    at span (<anonymous>)
-    at <unknown> (src/components/layout/BreakingTicker.tsx:33:17)
-    at Array.map (<anonymous>)
-    at BreakingTicker (src/components/layout/BreakingTicker.tsx:26:48)
-    at RootLayout (src/app/layout.tsx:46:9)
-  31 |               >
-  32 |                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 group-hover:bg-blue-400 transition-colors" />
-> 33 |                 <span className="text-xs font-bold text-red-400 uppercase tracking-wide">
-     |                 ^
-  34 |                   [{item.category}]
-  35 |                 </span>
-  36 |                 <span className="font-medium text-slate-200 group-hover:underline">
- GET /news/collapsed-glacier-likely-caused-devastating-nepal-tibet-floods-scientists-say 200 in 163ms (next.js: 4ms, generate-params: 15ms, application-code: 144ms)
-[browser] Uncaught Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
-
-- A server/client branch `if (typeof window !== 'undefined')`.
-- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
-- Date formatting in a user's locale which doesn't match the server.
-- External changing data without sending a snapshot of it along with the HTML.
-- Invalid HTML tag nesting.
-
-It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
-
-https://react.dev/link/hydration-mismatch
-
-  ...
-    <HTTPAccessFallbackErrorBoundary pathname="/news/coll..." notFound={<NotAllowedRootHTTPFallbackError>} ...>
-      <RedirectBoundary>
-        <RedirectErrorBoundary router={{...}}>
-          <Head>
-          <__next_root_layout_boundary__>
-            <SegmentViewNode type="layout" pagePath="src/layout...">
-              <SegmentTrieNode>
-              <link>
-              <script>
-              <script>
-              <RootLayout>
-                <html lang="en" className="h-full">
-                  <body className="min-h-full...">
-                    <Script>
-                    <Header>
-                    <BreakingTicker>
-                      <div className="bg-slate-9...">
-                        <div className="max-w-7xl ...">
-                          <div>
-                          <div className="relative o...">
-                            <div className="inline-fle...">
-                              <LinkComponent href="/news/open..." className="inline-fle...">
-                                <a
-                                  className="inline-flex items-center gap-2 hover:text-blue-400 transition-colors group"
-                                  ref={function}
-                                  onClick={function onClick}
-                                  onMouseEnter={function onMouseEnter}
-                                  onTouchStart={function onTouchStart}
-+                                 href="/news/openai-unveils-gpt-5-quantum-leap-reasoning"
--                                 href="/news/collapsed-glacier-likely-caused-devastating-nepal-tibet-floods-scientist..."
-                                >
-                                  <span>
-                                  <span className="text-xs fo...">
-+                                   AI
--                                   World
-                                    ...
-                                  ...
-                              ...
-                          ...
-                    ...
-          ...
-
-    at <unknown> (https://react.dev/link/hydration-mismatch)
-    at span (<anonymous>)
-    at <unknown> (src/components/layout/BreakingTicker.tsx:33:17)
-    at Array.map (<anonymous>)
-    at BreakingTicker (src/components/layout/BreakingTicker.tsx:26:48)
-    at RootLayout (src/app/layout.tsx:46:9)
-  31 |               >
-  32 |                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 group-hover:bg-blue-400 transition-colors" />
-> 33 |                 <span className="text-xs font-bold text-red-400 uppercase tracking-wide">
-     |                 ^
-  34 |                   [{item.category}]
-  35 |                 </span>
-  36 |                 <span className="font-medium text-slate-200 group-hover:underline">
+    at HomePage (src/app/page.tsx:64:21)
+  62 |                   {/* Category Pill */}
+  63 |                   <div className="absolute top-4 left-4 flex gap-2">
+> 64 |                     <span className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-blue-600 text-white shadow-sm">
+     |                     ^
+  65 |                       {heroArticle.category}
+  66 |                     </span>
+  67 |                     {heroArticle.isBreaking && (
+ GET /api/articles 200 in 1535ms (next.js: 1473ms, application-code: 62ms)
+ GET /api/articles 200 in 20ms (next.js: 7ms, application-code: 13ms)
