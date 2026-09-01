@@ -28,6 +28,8 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Run Auto-News Generation Script
+        id: generate
+        continue-on-error: true
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -36,6 +38,7 @@ jobs:
           python scripts/auto_news.py
 
       - name: Commit and push generated news articles
+        if: steps.generate.outcome == 'success'
         env:
           VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: |
@@ -54,3 +57,35 @@ jobs:
               echo "VERCEL_DEPLOY_HOOK_URL secret is not set, skipping deploy hook."
             fi
           fi
+
+      - name: Send WhatsApp alert if no article was published
+        if: steps.generate.outcome == 'failure'
+        continue-on-error: true
+        env:
+          WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+          CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
+        run: |
+          MESSAGE="Nexnews Alert: No article was published in the latest run ($(date -u +'%Y-%m-%d %H:%M UTC')). Check GitHub Actions logs for the reason."
+          ENCODED=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1]))" "$MESSAGE")
+          curl -s "https://api.callmebot.com/whatsapp.php?phone=${WHATSAPP_PHONE}&text=${ENCODED}&apikey=${CALLMEBOT_APIKEY}"
+
+      - name: Send email alert if no article was published
+        if: steps.generate.outcome == 'failure'
+        continue-on-error: true
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+        run: |
+          curl -s -X POST "https://api.resend.com/emails" \
+            -H "Authorization: Bearer ${RESEND_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"from\": \"Nexnews Alerts <onboarding@resend.dev>\",
+              \"to\": [\"${ALERT_EMAIL_TO}\"],
+              \"subject\": \"Nexnews Alert: No article published\",
+              \"text\": \"No article was published in the latest scheduled run ($(date -u +'%Y-%m-%d %H:%M UTC')). Check the GitHub Actions logs for the auto-news workflow to see the reason (Gemini/OpenAI error, all candidates duplicate, or total fetch failure).\"
+            }"
+
+      - name: Fail the job if nothing was published
+        if: steps.generate.outcome == 'failure'
+        run: exit 1
