@@ -775,10 +775,15 @@ def backup_to_google_drive(file_path: str) -> bool:
     Logs errors gracefully without throwing exceptions.
     """
     gdrive_sa_key = os.environ.get("GDRIVE_SERVICE_ACCOUNT_KEY")
+    if gdrive_sa_key:
+        gdrive_sa_key = gdrive_sa_key.strip()
+
     gdrive_folder_id = os.environ.get("GDRIVE_FOLDER_ID")
+    if gdrive_folder_id:
+        gdrive_folder_id = gdrive_folder_id.strip()
 
     if not gdrive_sa_key or not gdrive_folder_id:
-        print("[-] GDRIVE_SERVICE_ACCOUNT_KEY or GDRIVE_FOLDER_ID is not configured. Skipping Google Drive backup.")
+        print("[-] GDRIVE_SERVICE_ACCOUNT_KEY or GDRIVE_FOLDER_ID is missing or empty. Skipping Google Drive backup.")
         return False
 
     if not os.path.exists(file_path):

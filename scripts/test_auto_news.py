@@ -186,6 +186,11 @@ class TestGoogleDriveBackup(unittest.TestCase):
         os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"] = "some_key"
         self.assertFalse(auto_news.backup_to_google_drive("/dummy/path.json"))
 
+    def test_backup_to_google_drive_whitespace_env_vars(self):
+        os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"] = "   \n "
+        os.environ["GDRIVE_FOLDER_ID"] = "   \n "
+        self.assertFalse(auto_news.backup_to_google_drive("/dummy/path.json"))
+
     @patch("os.path.exists")
     def test_backup_to_google_drive_file_not_found(self, mock_exists):
         os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"] = "some_key"
@@ -201,8 +206,8 @@ class TestGoogleDriveBackup(unittest.TestCase):
     def test_backup_to_google_drive_success_json_string(
         self, mock_exists, mock_cred_info, mock_build, mock_media
     ):
-        os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"] = json.dumps({"type": "service_account"})
-        os.environ["GDRIVE_FOLDER_ID"] = "folder_xyz"
+        os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"] = "  " + json.dumps({"type": "service_account"}) + "\n "
+        os.environ["GDRIVE_FOLDER_ID"] = "  folder_xyz \n"
         mock_exists.return_value = True
 
         mock_drive_service = MagicMock()
