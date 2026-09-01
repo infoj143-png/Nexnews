@@ -22,6 +22,8 @@ import xml.etree.ElementTree as ET
 from google.oauth2 import service_account
 from google.auth.transport.requests import AuthorizedSession
 
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+
 VALID_CATEGORIES = ["Tech", "World", "Business", "AI", "Sports"]
 
 CATEGORY_IMAGES = {
@@ -341,7 +343,7 @@ def validate_article_output(data: dict) -> bool:
 
 def generate_article_gemini(topic: dict, api_key: str) -> dict:
     """Generates an SEO/GEO optimized article centered around high-demand search intent using Google Gemini API."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={api_key}"
 
     trending_kw = sanitize_prompt_input(topic.get("trending_keyword") or topic.get("title"))
     traffic = sanitize_prompt_input(topic.get("approx_traffic") or "High Search Demand")
@@ -392,16 +394,24 @@ Return ONLY a valid JSON object matching this schema:
         headers={"Content-Type": "application/json"}
     )
 
-    with urllib.request.urlopen(req, timeout=30) as response:
-        res_data = json.loads(response.read().decode('utf-8'))
-        raw_text = res_data["candidates"][0]["content"]["parts"][0]["text"]
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            raw_text = res_data["candidates"][0]["content"]["parts"][0]["text"]
 
-        raw_text = re.sub(r'^```json\s*', '', raw_text, flags=re.MULTILINE)
-        raw_text = re.sub(r'^```\s*', '', raw_text, flags=re.MULTILINE)
-        raw_text = re.sub(r'\s*```$', '', raw_text, flags=re.MULTILINE)
+            raw_text = re.sub(r'^```json\s*', '', raw_text, flags=re.MULTILINE)
+            raw_text = re.sub(r'^```\s*', '', raw_text, flags=re.MULTILINE)
+            raw_text = re.sub(r'\s*```$', '', raw_text, flags=re.MULTILINE)
 
-        parsed = json.loads(raw_text.strip())
-        return parsed if validate_article_output(parsed) else None
+            parsed = json.loads(raw_text.strip())
+            return parsed if validate_article_output(parsed) else None
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode('utf-8', errors='ignore')
+        print(f"  [-] Gemini HTTP error {e.code} ({e.reason}): {error_body}")
+        return None
+    except Exception as e:
+        print(f"  [-] Gemini API call error: {e}")
+        return None
 
 def generate_article_openai(topic: dict, api_key: str) -> dict:
     """Generates an SEO/GEO optimized article using OpenAI API."""
@@ -449,11 +459,19 @@ Return ONLY a valid JSON object:
         }
     )
 
-    with urllib.request.urlopen(req, timeout=30) as response:
-        res_data = json.loads(response.read().decode('utf-8'))
-        raw_text = res_data["choices"][0]["message"]["content"]
-        parsed = json.loads(raw_text.strip())
-        return parsed if validate_article_output(parsed) else None
+    try:
+        with urllib.request.urlopen(req, timeout=30) as response:
+            res_data = json.loads(response.read().decode('utf-8'))
+            raw_text = res_data["choices"][0]["message"]["content"]
+            parsed = json.loads(raw_text.strip())
+            return parsed if validate_article_output(parsed) else None
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode('utf-8', errors='ignore')
+        print(f"  [-] OpenAI HTTP error {e.code} ({e.reason}): {error_body}")
+        return None
+    except Exception as e:
+        print(f"  [-] OpenAI API call error: {e}")
+        return None
 
 def main():
     print("==================================================")
@@ -472,7 +490,7 @@ def main():
 
     if not candidates:
         print("[-] Genuine total fetch failure: No candidates retrieved across worldwide RSS feeds. Skipping run.")
-        sys.exit(0)
+        sys.exit(1)
 
     print(f"[+] Total worldwide candidates fetched & ranked: {len(candidates)}")
 
@@ -520,7 +538,7 @@ def main():
 
     if not generated_article_data or not selected_topic:
         print("[-] Skipping run: All candidate items were either duplicates or failed AI content generation.")
-        sys.exit(0)
+        sys.exit(1)
 
     # Validate category from LLM response (Gemini JSON response is source of truth)
     cat = generated_article_data.get("category")
