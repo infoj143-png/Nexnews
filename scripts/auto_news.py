@@ -810,7 +810,8 @@ def backup_to_google_drive(file_path: str) -> bool:
         uploaded_file = drive_service.files().create(
             body=file_metadata,
             media_body=media,
-            fields="id"
+            fields="id",
+            supportsAllDrives=True
         ).execute()
 
         file_id = uploaded_file.get("id")

@@ -219,7 +219,8 @@ class TestGoogleDriveBackup(unittest.TestCase):
         mock_drive_service.files().create.assert_called_once_with(
             body={"name": "test-article.json", "parents": ["folder_xyz"]},
             media_body=mock_media.return_value,
-            fields="id"
+            fields="id",
+            supportsAllDrives=True
         )
 
     @patch("auto_news.MediaFileUpload")
