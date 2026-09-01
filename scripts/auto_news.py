@@ -22,7 +22,89 @@ import xml.etree.ElementTree as ET
 from google.oauth2 import service_account
 from google.auth.transport.requests import AuthorizedSession
 
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+_CACHED_GEMINI_MODEL = None
+
+def get_current_gemini_model(api_key: str = None) -> str:
+    """
+    Dynamically discovers the latest stable Gemini Flash model via Google's ListModels API.
+    Fallback priority:
+    1. Highest version stable Flash model returned by ListModels API.
+    2. GEMINI_MODEL environment variable if set.
+    3. Hardcoded last-resort default ('gemini-2.5-flash').
+    Result is cached for the duration of the run.
+    """
+    global _CACHED_GEMINI_MODEL
+    if _CACHED_GEMINI_MODEL:
+        return _CACHED_GEMINI_MODEL
+
+    # 1. Query ListModels API if key is available
+    if api_key:
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+            req = urllib.request.Request(url, headers={"User-Agent": "Nexnews-AutoNews/1.0"})
+            with urllib.request.urlopen(req, timeout=10) as response:
+                if response.status == 200:
+                    data = json.loads(response.read().decode('utf-8'))
+                    models = data.get("models", [])
+                    matching_models = []
+
+                    excluded_keywords = ["preview", "exp", "experimental", "tuning", "thinking"]
+
+                    for m in models:
+                        methods = m.get("supportedGenerationMethods", [])
+                        if "generateContent" not in methods:
+                            continue
+
+                        name = m.get("name", "")
+                        clean_name = name.split("/")[-1] if "/" in name else name
+                        clean_name_lower = clean_name.lower()
+
+                        if "flash" not in clean_name_lower:
+                            continue
+
+                        if any(kw in clean_name_lower for kw in excluded_keywords):
+                            continue
+
+                        # Extract numeric version
+                        match = re.search(r'gemini-(\d+(?:\.\d+)?)', clean_name, re.IGNORECASE)
+                        if match:
+                            try:
+                                version = float(match.group(1))
+                            except ValueError:
+                                version = 0.0
+                        else:
+                            version = 0.0
+
+                        matching_models.append((version, clean_name, name))
+
+                    if matching_models:
+                        # Sort by version desc, then clean_name length asc (shorter/plainer model name preferred)
+                        matching_models.sort(key=lambda x: (x[0], -len(x[1])), reverse=True)
+                        selected_name = matching_models[0][1]
+                        print(f"[+] [GEMINI MODEL SELECTION] Auto-discovered latest stable Flash model via ListModels API: '{selected_name}'")
+                        _CACHED_GEMINI_MODEL = selected_name
+                        return selected_name
+                    else:
+                        print("[-] [GEMINI MODEL SELECTION] ListModels API call succeeded but no matching stable Flash model was found.")
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8', errors='ignore')
+            print(f"[-] [GEMINI MODEL SELECTION] ListModels API HTTP error {e.code} ({e.reason}): {error_body}")
+        except Exception as e:
+            print(f"[-] [GEMINI MODEL SELECTION] ListModels API call failed: {e}")
+
+    # 2. Check GEMINI_MODEL environment variable
+    env_model = os.environ.get("GEMINI_MODEL")
+    if env_model and env_model.strip():
+        selected_name = env_model.strip()
+        print(f"[+] [GEMINI MODEL SELECTION] Using GEMINI_MODEL environment variable: '{selected_name}'")
+        _CACHED_GEMINI_MODEL = selected_name
+        return selected_name
+
+    # 3. Hardcoded last-resort default
+    hardcoded_fallback = "gemini-2.5-flash"
+    print(f"[+] [GEMINI MODEL SELECTION] Using hardcoded last-resort default model: '{hardcoded_fallback}'")
+    _CACHED_GEMINI_MODEL = hardcoded_fallback
+    return hardcoded_fallback
 
 VALID_CATEGORIES = ["Tech", "World", "Business", "AI", "Sports"]
 
@@ -341,9 +423,10 @@ def validate_article_output(data: dict) -> bool:
 
     return True
 
-def generate_article_gemini(topic: dict, api_key: str) -> dict:
+def generate_article_gemini(topic: dict, api_key: str, model_name: str = None) -> dict:
     """Generates an SEO/GEO optimized article centered around high-demand search intent using Google Gemini API."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={api_key}"
+    resolved_model = model_name or get_current_gemini_model(api_key)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{resolved_model}:generateContent?key={api_key}"
 
     trending_kw = sanitize_prompt_input(topic.get("trending_keyword") or topic.get("title"))
     traffic = sanitize_prompt_input(topic.get("approx_traffic") or "High Search Demand")
@@ -481,6 +564,10 @@ def main():
     gemini_key = os.environ.get("GEMINI_API_KEY")
     openai_key = os.environ.get("OPENAI_API_KEY")
 
+    resolved_gemini_model = None
+    if gemini_key:
+        resolved_gemini_model = get_current_gemini_model(gemini_key)
+
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     articles_dir = os.path.join(repo_root, "data", "articles")
     os.makedirs(articles_dir, exist_ok=True)
@@ -513,7 +600,7 @@ def main():
         article_data = None
         if gemini_key:
             try:
-                article_data = generate_article_gemini(candidate, gemini_key)
+                article_data = generate_article_gemini(candidate, gemini_key, resolved_gemini_model)
             except Exception as e:
                 print(f"  [-] Gemini generation error for candidate: {e}")
 
