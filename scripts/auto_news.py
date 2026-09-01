@@ -22,20 +22,53 @@ import xml.etree.ElementTree as ET
 from google.oauth2 import service_account
 from google.auth.transport.requests import AuthorizedSession
 
-_CACHED_GEMINI_MODEL = None
+_CACHED_GEMINI_CANDIDATES = None
 
-def get_current_gemini_model(api_key: str = None) -> str:
+STANDARD_FALLBACK_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro"
+]
+
+def clean_model_name(model_name: str) -> str:
     """
-    Dynamically discovers the latest stable Gemini Flash model via Google's ListModels API.
-    Fallback priority:
-    1. Highest version stable Flash model returned by ListModels API.
-    2. GEMINI_MODEL environment variable if set.
-    3. Hardcoded last-resort default ('gemini-2.5-flash').
+    Cleans up a model name by stripping any leading 'models/' or '/' prefixes
+    to prevent double prefix issues (e.g. 'models/models/gemini...').
+    """
+    if not model_name:
+        return ""
+    cleaned = model_name.strip()
+    changed = True
+    while changed:
+        changed = False
+        if cleaned.startswith("/"):
+            cleaned = cleaned[1:].strip()
+            changed = True
+        if cleaned.startswith("models/"):
+            cleaned = cleaned[len("models/"):].strip()
+            changed = True
+    return cleaned
+
+def get_gemini_candidate_models(api_key: str = None) -> list:
+    """
+    Dynamically discovers Gemini models supporting generateContent via Google's ListModels API.
+    Returns an ordered list of clean candidate model names (highest performing / highest version first),
+    followed by the GEMINI_MODEL environment variable (if set) and an ordered fallback array of standard models.
     Result is cached for the duration of the run.
     """
-    global _CACHED_GEMINI_MODEL
-    if _CACHED_GEMINI_MODEL:
-        return _CACHED_GEMINI_MODEL
+    global _CACHED_GEMINI_CANDIDATES
+    if _CACHED_GEMINI_CANDIDATES is not None:
+        return _CACHED_GEMINI_CANDIDATES
+
+    candidates = []
+    seen = set()
+
+    def add_candidate(m_name: str):
+        c_name = clean_model_name(m_name)
+        if c_name and c_name not in seen:
+            seen.add(c_name)
+            candidates.append(c_name)
 
     # 1. Query ListModels API if key is available
     if api_key:
@@ -55,12 +88,9 @@ def get_current_gemini_model(api_key: str = None) -> str:
                         if "generateContent" not in methods:
                             continue
 
-                        name = m.get("name", "")
-                        clean_name = name.split("/")[-1] if "/" in name else name
+                        raw_name = m.get("name", "")
+                        clean_name = clean_model_name(raw_name)
                         clean_name_lower = clean_name.lower()
-
-                        if "flash" not in clean_name_lower:
-                            continue
 
                         if any(kw in clean_name_lower for kw in excluded_keywords):
                             continue
@@ -75,36 +105,42 @@ def get_current_gemini_model(api_key: str = None) -> str:
                         else:
                             version = 0.0
 
-                        matching_models.append((version, clean_name, name))
+                        # Preference: Flash models prioritized for speed/cost, higher version first, shorter name length
+                        is_flash = 1 if "flash" in clean_name_lower else 0
+                        matching_models.append((is_flash, version, -len(clean_name), clean_name))
 
                     if matching_models:
-                        # Sort by version desc, then clean_name length asc (shorter/plainer model name preferred)
-                        matching_models.sort(key=lambda x: (x[0], -len(x[1])), reverse=True)
-                        selected_name = matching_models[0][1]
-                        print(f"[+] [GEMINI MODEL SELECTION] Auto-discovered latest stable Flash model via ListModels API: '{selected_name}'")
-                        _CACHED_GEMINI_MODEL = selected_name
-                        return selected_name
+                        # Sort descending: flash preference, highest version, shortest clean name
+                        matching_models.sort(reverse=True)
+                        for item in matching_models:
+                            add_candidate(item[3])
+                        print(f"[+] [GEMINI MODEL SELECTION] Auto-discovered {len(matching_models)} candidate model(s) via ListModels API: {candidates}")
                     else:
-                        print("[-] [GEMINI MODEL SELECTION] ListModels API call succeeded but no matching stable Flash model was found.")
+                        print("[-] [GEMINI MODEL SELECTION] ListModels API call succeeded but no matching stable generateContent model was found.")
         except urllib.error.HTTPError as e:
             error_body = e.read().decode('utf-8', errors='ignore')
             print(f"[-] [GEMINI MODEL SELECTION] ListModels API HTTP error {e.code} ({e.reason}): {error_body}")
         except Exception as e:
             print(f"[-] [GEMINI MODEL SELECTION] ListModels API call failed: {e}")
 
-    # 2. Check GEMINI_MODEL environment variable
+    # 2. Add GEMINI_MODEL environment variable if set
     env_model = os.environ.get("GEMINI_MODEL")
     if env_model and env_model.strip():
-        selected_name = env_model.strip()
-        print(f"[+] [GEMINI MODEL SELECTION] Using GEMINI_MODEL environment variable: '{selected_name}'")
-        _CACHED_GEMINI_MODEL = selected_name
-        return selected_name
+        add_candidate(env_model.strip())
 
-    # 3. Hardcoded last-resort default
-    hardcoded_fallback = "gemini-2.5-flash"
-    print(f"[+] [GEMINI MODEL SELECTION] Using hardcoded last-resort default model: '{hardcoded_fallback}'")
-    _CACHED_GEMINI_MODEL = hardcoded_fallback
-    return hardcoded_fallback
+    # 3. Add ordered standard fallback models
+    for fb in STANDARD_FALLBACK_MODELS:
+        add_candidate(fb)
+
+    _CACHED_GEMINI_CANDIDATES = candidates
+    return candidates
+
+def get_current_gemini_model(api_key: str = None) -> str:
+    """
+    Returns the top candidate model name for backwards compatibility.
+    """
+    candidates = get_gemini_candidate_models(api_key)
+    return candidates[0] if candidates else "gemini-2.5-flash"
 
 VALID_CATEGORIES = ["Tech", "World", "Business", "AI", "Sports"]
 
@@ -423,10 +459,15 @@ def validate_article_output(data: dict) -> bool:
 
     return True
 
-def generate_article_gemini(topic: dict, api_key: str, model_name: str = None) -> dict:
-    """Generates an SEO/GEO optimized article centered around high-demand search intent using Google Gemini API."""
-    resolved_model = model_name or get_current_gemini_model(api_key)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{resolved_model}:generateContent?key={api_key}"
+def generate_article_gemini(topic: dict, api_key: str, candidate_models: list = None) -> dict:
+    """
+    Generates an SEO/GEO optimized article centered around high-demand search intent using Google Gemini API.
+    Iterates through candidate models until generation succeeds or all candidates are exhausted.
+    """
+    if candidate_models is None:
+        candidate_models = get_gemini_candidate_models(api_key)
+    elif isinstance(candidate_models, str):
+        candidate_models = [candidate_models]
 
     trending_kw = sanitize_prompt_input(topic.get("trending_keyword") or topic.get("title"))
     traffic = sanitize_prompt_input(topic.get("approx_traffic") or "High Search Demand")
@@ -471,30 +512,43 @@ Return ONLY a valid JSON object matching this schema:
         }
     }
 
-    req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode('utf-8'),
-        headers={"Content-Type": "application/json"}
-    )
+    for model_item in candidate_models:
+        clean_name = clean_model_name(model_item)
+        if not clean_name:
+            continue
 
-    try:
-        with urllib.request.urlopen(req, timeout=30) as response:
-            res_data = json.loads(response.read().decode('utf-8'))
-            raw_text = res_data["candidates"][0]["content"]["parts"][0]["text"]
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{clean_name}:generateContent?key={api_key}"
 
-            raw_text = re.sub(r'^```json\s*', '', raw_text, flags=re.MULTILINE)
-            raw_text = re.sub(r'^```\s*', '', raw_text, flags=re.MULTILINE)
-            raw_text = re.sub(r'\s*```$', '', raw_text, flags=re.MULTILINE)
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode('utf-8'),
+            headers={"Content-Type": "application/json"}
+        )
 
-            parsed = json.loads(raw_text.strip())
-            return parsed if validate_article_output(parsed) else None
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode('utf-8', errors='ignore')
-        print(f"  [-] Gemini HTTP error {e.code} ({e.reason}): {error_body}")
-        return None
-    except Exception as e:
-        print(f"  [-] Gemini API call error: {e}")
-        return None
+        try:
+            with urllib.request.urlopen(req, timeout=30) as response:
+                res_data = json.loads(response.read().decode('utf-8'))
+                raw_text = res_data["candidates"][0]["content"]["parts"][0]["text"]
+
+                raw_text = re.sub(r'^```json\s*', '', raw_text, flags=re.MULTILINE)
+                raw_text = re.sub(r'^```\s*', '', raw_text, flags=re.MULTILINE)
+                raw_text = re.sub(r'\s*```$', '', raw_text, flags=re.MULTILINE)
+
+                parsed = json.loads(raw_text.strip())
+                if validate_article_output(parsed):
+                    print(f"  [+] Gemini article generated successfully using model: '{clean_name}'")
+                    parsed["_used_model"] = clean_name
+                    return parsed
+                else:
+                    print(f"  [-] Model '{clean_name}' returned response that failed defensive validation.")
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode('utf-8', errors='ignore')
+            print(f"  [-] Gemini HTTP error {e.code} ({e.reason}) with model '{clean_name}': {error_body}")
+        except Exception as e:
+            print(f"  [-] Gemini API call error with model '{clean_name}': {e}")
+
+    print("  [-] All Gemini candidate models failed for this topic.")
+    return None
 
 def generate_article_openai(topic: dict, api_key: str) -> dict:
     """Generates an SEO/GEO optimized article using OpenAI API."""
@@ -564,9 +618,9 @@ def main():
     gemini_key = os.environ.get("GEMINI_API_KEY")
     openai_key = os.environ.get("OPENAI_API_KEY")
 
-    resolved_gemini_model = None
+    gemini_candidate_models = None
     if gemini_key:
-        resolved_gemini_model = get_current_gemini_model(gemini_key)
+        gemini_candidate_models = get_gemini_candidate_models(gemini_key)
 
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     articles_dir = os.path.join(repo_root, "data", "articles")
@@ -591,37 +645,44 @@ def main():
     for idx, candidate in enumerate(candidates):
         print(f"[*] Checking candidate #{idx+1}: '{candidate['trending_keyword']}' ({candidate['approx_traffic']}) from {candidate['source']}")
 
-        if is_duplicate_candidate(candidate, recent_topics):
-            print(f"  [-] Candidate '{candidate['trending_keyword']}' is a near-duplicate of recent publication. Falling through...")
+        try:
+            if is_duplicate_candidate(candidate, recent_topics):
+                print(f"  [-] Candidate '{candidate['trending_keyword']}' is a near-duplicate of recent publication. Falling through...")
+                continue
+
+            print(f"  [+] Candidate accepted: '{candidate['trending_keyword']}'. Triggering AI generation...")
+
+            article_data = None
+            if gemini_key:
+                try:
+                    article_data = generate_article_gemini(candidate, gemini_key, gemini_candidate_models)
+                except Exception as e:
+                    print(f"  [-] Gemini generation error for candidate: {e}")
+
+            if not article_data and openai_key:
+                try:
+                    article_data = generate_article_openai(candidate, openai_key)
+                    if article_data:
+                        article_data["_used_model"] = "gpt-4o-mini"
+                except Exception as e:
+                    print(f"  [-] OpenAI generation error for candidate: {e}")
+
+            # Defensive validation of LLM response
+            if article_data and isinstance(article_data, dict):
+                content = article_data.get("content", "").strip()
+                title = article_data.get("title", "").strip()
+
+                if content and title:
+                    selected_topic = candidate
+                    generated_article_data = article_data
+                    used_model = article_data.get("_used_model", "unknown")
+                    print(f"  [SUCCESS] Successfully generated article: '{title}' using model: '{used_model}'")
+                    break
+                else:
+                    print("  [-] LLM returned missing/empty content or title. Treating as candidate failure and falling through...")
+        except Exception as e:
+            print(f"  [-] Unexpected error processing candidate '{candidate.get('trending_keyword', 'unknown')}': {e}. Falling through to next candidate...")
             continue
-
-        print(f"  [+] Candidate accepted: '{candidate['trending_keyword']}'. Triggering AI generation...")
-
-        article_data = None
-        if gemini_key:
-            try:
-                article_data = generate_article_gemini(candidate, gemini_key, resolved_gemini_model)
-            except Exception as e:
-                print(f"  [-] Gemini generation error for candidate: {e}")
-
-        if not article_data and openai_key:
-            try:
-                article_data = generate_article_openai(candidate, openai_key)
-            except Exception as e:
-                print(f"  [-] OpenAI generation error for candidate: {e}")
-
-        # Defensive validation of LLM response
-        if article_data and isinstance(article_data, dict):
-            content = article_data.get("content", "").strip()
-            title = article_data.get("title", "").strip()
-
-            if content and title:
-                selected_topic = candidate
-                generated_article_data = article_data
-                print(f"  [SUCCESS] Successfully generated article: '{title}'")
-                break
-            else:
-                print("  [-] LLM returned missing/empty content or title. Treating as candidate failure and falling through...")
 
     if not generated_article_data or not selected_topic:
         print("[-] Skipping run: All candidate items were either duplicates or failed AI content generation.")
