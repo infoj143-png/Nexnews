@@ -165,5 +165,105 @@ class TestResilientExecutionLoop(unittest.TestCase):
         self.assertEqual(result["title"], "Valid Test Title")
         self.assertEqual(result["_used_model"], "gemini-2.5-flash")
 
+class TestGoogleDriveBackup(unittest.TestCase):
+    def setUp(self):
+        self.env_patches = {
+            "GDRIVE_SERVICE_ACCOUNT_KEY": "{\"type\": \"service_account\", \"project_id\": \"test\"}",
+            "GDRIVE_FOLDER_ID": "test_folder_123"
+        }
+        for k in list(os.environ.keys()):
+            if k.startswith("GDRIVE_"):
+                del os.environ[k]
+
+    def tearDown(self):
+        for k in list(os.environ.keys()):
+            if k.startswith("GDRIVE_"):
+                del os.environ[k]
+
+    def test_backup_to_google_drive_missing_env_vars(self):
+        self.assertFalse(auto_news.backup_to_google_drive("/dummy/path.json"))
+
+        os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"] = "some_key"
+        self.assertFalse(auto_news.backup_to_google_drive("/dummy/path.json"))
+
+    @patch("os.path.exists")
+    def test_backup_to_google_drive_file_not_found(self, mock_exists):
+        os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"] = "some_key"
+        os.environ["GDRIVE_FOLDER_ID"] = "some_folder"
+        mock_exists.return_value = False
+
+        self.assertFalse(auto_news.backup_to_google_drive("/dummy/nonexistent.json"))
+
+    @patch("auto_news.MediaFileUpload")
+    @patch("auto_news.build")
+    @patch("google.oauth2.service_account.Credentials.from_service_account_info")
+    @patch("os.path.exists")
+    def test_backup_to_google_drive_success_json_string(
+        self, mock_exists, mock_cred_info, mock_build, mock_media
+    ):
+        os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"] = json.dumps({"type": "service_account"})
+        os.environ["GDRIVE_FOLDER_ID"] = "folder_xyz"
+        mock_exists.return_value = True
+
+        mock_drive_service = MagicMock()
+        mock_create_req = MagicMock()
+        mock_create_req.execute.return_value = {"id": "file_drive_id_999"}
+        mock_drive_service.files().create.return_value = mock_create_req
+        mock_build.return_value = mock_drive_service
+
+        result = auto_news.backup_to_google_drive("/data/articles/test-article.json")
+
+        self.assertTrue(result)
+        mock_cred_info.assert_called_once()
+        mock_build.assert_called_once_with("drive", "v3", credentials=mock_cred_info.return_value)
+        mock_drive_service.files().create.assert_called_once_with(
+            body={"name": "test-article.json", "parents": ["folder_xyz"]},
+            media_body=mock_media.return_value,
+            fields="id"
+        )
+
+    @patch("auto_news.MediaFileUpload")
+    @patch("auto_news.build")
+    @patch("google.oauth2.service_account.Credentials.from_service_account_file")
+    @patch("os.path.isfile")
+    @patch("os.path.exists")
+    def test_backup_to_google_drive_success_file_path(
+        self, mock_exists, mock_isfile, mock_cred_file, mock_build, mock_media
+    ):
+        os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"] = "/path/to/sa_key.json"
+        os.environ["GDRIVE_FOLDER_ID"] = "folder_abc"
+
+        def exists_side_effect(path):
+            return True
+
+        def isfile_side_effect(path):
+            return path == "/path/to/sa_key.json"
+
+        mock_exists.side_effect = exists_side_effect
+        mock_isfile.side_effect = isfile_side_effect
+
+        mock_drive_service = MagicMock()
+        mock_create_req = MagicMock()
+        mock_create_req.execute.return_value = {"id": "file_drive_id_111"}
+        mock_drive_service.files().create.return_value = mock_create_req
+        mock_build.return_value = mock_drive_service
+
+        result = auto_news.backup_to_google_drive("/data/articles/test-article-2.json")
+
+        self.assertTrue(result)
+        mock_cred_file.assert_called_once_with("/path/to/sa_key.json", scopes=["https://www.googleapis.com/auth/drive.file"])
+
+    @patch("os.path.exists")
+    @patch("google.oauth2.service_account.Credentials.from_service_account_info")
+    def test_backup_to_google_drive_exception_handling(self, mock_cred_info, mock_exists):
+        os.environ["GDRIVE_SERVICE_ACCOUNT_KEY"] = json.dumps({"type": "service_account"})
+        os.environ["GDRIVE_FOLDER_ID"] = "folder_xyz"
+        mock_exists.return_value = True
+
+        mock_cred_info.side_effect = Exception("Auth API failure")
+
+        result = auto_news.backup_to_google_drive("/data/articles/test-article.json")
+        self.assertFalse(result)
+
 if __name__ == "__main__":
     unittest.main()

@@ -21,6 +21,8 @@ import xml.etree.ElementTree as ET
 
 from google.oauth2 import service_account
 from google.auth.transport.requests import AuthorizedSession
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
 
 _CACHED_GEMINI_CANDIDATES = None
 
@@ -758,10 +760,65 @@ def main():
     if not target_repo and os.environ.get("CI"):
         print("[-] GITHUB_REPOSITORY environment variable is not configured in CI environment.")
 
+    # Backup newly published article JSON to Google Drive
+    backup_to_google_drive(file_path)
+
     # Automatically submit newly published article to Google Indexing API
     site_url = os.environ.get("SITE_URL", "https://nexnews-nu.vercel.app").rstrip("/")
     article_url = f"{site_url}/news/{slug}"
     submit_to_google_indexing(article_url)
+
+def backup_to_google_drive(file_path: str) -> bool:
+    """
+    Uploads a copy of the specified article JSON file to Google Drive folder specified by GDRIVE_FOLDER_ID.
+    Uses GDRIVE_SERVICE_ACCOUNT_KEY (JSON string or path to JSON file) for authentication.
+    Logs errors gracefully without throwing exceptions.
+    """
+    gdrive_sa_key = os.environ.get("GDRIVE_SERVICE_ACCOUNT_KEY")
+    gdrive_folder_id = os.environ.get("GDRIVE_FOLDER_ID")
+
+    if not gdrive_sa_key or not gdrive_folder_id:
+        print("[-] GDRIVE_SERVICE_ACCOUNT_KEY or GDRIVE_FOLDER_ID is not configured. Skipping Google Drive backup.")
+        return False
+
+    if not os.path.exists(file_path):
+        print(f"[-] Article file does not exist at path: {file_path}. Skipping Google Drive backup.")
+        return False
+
+    scopes = ["https://www.googleapis.com/auth/drive.file"]
+
+    try:
+        if os.path.isfile(gdrive_sa_key):
+            credentials = service_account.Credentials.from_service_account_file(
+                gdrive_sa_key, scopes=scopes
+            )
+        else:
+            sa_info = json.loads(gdrive_sa_key)
+            credentials = service_account.Credentials.from_service_account_info(
+                sa_info, scopes=scopes
+            )
+
+        drive_service = build("drive", "v3", credentials=credentials)
+        filename = os.path.basename(file_path)
+
+        file_metadata = {
+            "name": filename,
+            "parents": [gdrive_folder_id]
+        }
+        media = MediaFileUpload(file_path, mimetype="application/json")
+
+        uploaded_file = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields="id"
+        ).execute()
+
+        file_id = uploaded_file.get("id")
+        print(f"[SUCCESS] Uploaded backup copy of '{filename}' to Google Drive (ID: {file_id}).")
+        return True
+    except Exception as e:
+        print(f"[-] Error uploading '{file_path}' to Google Drive: {e}")
+        return False
 
 def submit_to_google_indexing(article_url: str) -> bool:
     """
