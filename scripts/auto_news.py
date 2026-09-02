@@ -1038,9 +1038,9 @@ def main():
         "content": content,
         "category": cat,
         "author": {
-            "name": "Nexnews Autonomous Script",
+            "name": "Nexnews Desk",
             "avatar": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80",
-            "role": "Background Python Automation Pipeline"
+            "role": "Editorial Desk"
         },
         "publishedAt": published_at,
         "readTime": "4 min read",
