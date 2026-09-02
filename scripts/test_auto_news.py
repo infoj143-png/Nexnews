@@ -271,5 +271,57 @@ class TestGoogleDriveBackup(unittest.TestCase):
         result = auto_news.backup_to_google_drive("/data/articles/test-article.json")
         self.assertFalse(result)
 
+class TestKeywordExtractionAndRelevance(unittest.TestCase):
+    def test_iphone_headline_keyword_extraction(self):
+        headline = "iPhone 18 Pro pre-orders might start later than usual this year"
+        queries, core_entities = auto_news.extract_search_keywords(headline, "", "World")
+
+        self.assertIn("iphone", core_entities)
+        self.assertNotIn("pre", core_entities)
+        self.assertNotIn("orders", core_entities)
+        self.assertNotIn("start", core_entities)
+        self.assertNotIn("later", core_entities)
+
+        # Ensure no standalone noisy queries
+        for q in queries:
+            q_lower = q.lower()
+            self.assertFalse(q_lower == "pre" or q_lower == "orders" or q_lower == "start")
+
+    def test_movie_box_office_keyword_extraction(self):
+        headline = "Dune Part Two dominates global box office weekend sales"
+        queries, core_entities = auto_news.extract_search_keywords(headline, "", "Business")
+
+        self.assertIn("dune", core_entities)
+        self.assertTrue(any("dune" in q.lower() for q in queries))
+
+    def test_cricket_scorecard_keyword_extraction(self):
+        headline = "India vs Australia 3rd Test live scorecard and match updates"
+        queries, core_entities = auto_news.extract_search_keywords(headline, "", "Sports")
+
+        self.assertTrue("india" in core_entities or "australia" in core_entities)
+        self.assertTrue(any("cricket" in q.lower() or "india" in q.lower() or "australia" in q.lower() for q in queries))
+
+    def test_tech_company_keyword_extraction(self):
+        headline = "Nvidia announces new AI chip architecture at GTC conference"
+        queries, core_entities = auto_news.extract_search_keywords(headline, "", "Tech")
+
+        self.assertIn("nvidia", core_entities)
+        self.assertTrue(any("nvidia" in q.lower() for q in queries))
+
+    def test_image_relevance_sanity_check(self):
+        iphone_entities = ["iphone"]
+
+        # Automobile photo returned for iPhone should be rejected
+        car_meta = "2004 Toyota Alphard hybrid (pre-facelift).jpg"
+        self.assertFalse(auto_news.is_image_relevant(car_meta, iphone_entities, "World"))
+
+        # Actual iPhone photo should pass
+        iphone_meta = "Apple iPhone 13 Pro Max photo.jpg"
+        self.assertTrue(auto_news.is_image_relevant(iphone_meta, iphone_entities, "World"))
+
+        # Cricket stadium photo for India vs Australia cricket match should pass
+        stadium_meta = "Arun Jaitley Stadium during India vs Australia 2019 ODI.jpg"
+        self.assertTrue(auto_news.is_image_relevant(stadium_meta, ["india", "australia"], "Sports"))
+
 if __name__ == "__main__":
     unittest.main()
