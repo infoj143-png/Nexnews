@@ -160,84 +160,204 @@ STOP_WORDS = {
     "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would",
     "should", "could", "can", "may", "might", "must", "shall", "this", "that", "these",
     "those", "trending", "search", "analysis", "news", "vs", "versus", "live", "today",
-    "2024", "2025", "2026", "2027", "day", "match", "scorecard", "update", "updates",
-    "show", "hn", "opentie", "openxwa"
+    "yesterday", "tomorrow", "2024", "2025", "2026", "2027", "2028", "day", "days",
+    "month", "months", "week", "weeks", "year", "years", "time", "schedule", "update",
+    "updates", "updated", "start", "starts", "started", "starting", "later", "earlier",
+    "usual", "unusual", "delay", "delayed", "delays", "release", "releases", "released",
+    "releasing", "launch", "launches", "launched", "launching", "announce", "announces",
+    "announced", "announcing", "unveil", "unveils", "unveiled", "leak", "leaks", "leaked",
+    "rumor", "rumors", "report", "reports", "reported", "says", "say", "according",
+    "pre", "post", "order", "orders", "price", "cost", "buy", "sale", "sales", "stock",
+    "shares", "market", "deal", "best", "worst", "high", "low", "big", "more", "most",
+    "show", "shows", "watch", "match", "game", "scorecard", "win", "wins", "won", "lost",
+    "loss", "beat", "beats", "box", "office", "weekend", "gross", "earns", "earned",
+    "pro", "max", "mini", "plus", "ultra", "lite", "first", "second", "new", "latest",
+    "top", "hn", "opentie", "openxwa", "breaking", "than", "then", "other", "another",
+    "each", "every", "some", "any", "all", "both", "few", "such", "no", "nor", "not",
+    "only", "own", "same", "so", "too", "very", "just"
 }
 
-def extract_search_keywords(headline: str, trending_keyword: str = "", category: str = "") -> list:
-    """Extracts 2-3 essential keywords from headline/trending topic for image search queries."""
-    combined_text = f"{trending_keyword} {headline}"
-    cleaned = re.sub(r'[^\w\s]', ' ', combined_text)
-    words = [w.strip() for w in cleaned.split() if w.strip()]
+SYNONYMS = {
+    "iphone": ["iphone", "apple", "smartphone", "mobile", "ios"],
+    "ipad": ["ipad", "apple", "tablet"],
+    "macbook": ["macbook", "apple", "laptop"],
+    "nvidia": ["nvidia", "chip", "gpu", "semiconductor", "technology", "ai"],
+    "dune": ["dune", "movie", "film", "cinema", "theater", "poster", "actor"],
+    "cricket": ["cricket", "stadium", "match", "batsman", "bowler", "wicket", "sports"],
+    "india": ["india", "cricket", "indian", "stadium", "delhi", "mumbai"],
+    "australia": ["australia", "cricket", "australian", "stadium", "sydney", "melbourne"]
+}
 
-    meaningful = [w for w in words if w.lower() not in STOP_WORDS and len(w) > 2 and not w.isdigit()]
+def extract_search_keywords(headline: str, trending_keyword: str = "", category: str = "Tech") -> tuple:
+    """
+    Extracts entity-prioritized search queries and core entity terms from headline / trending topic / category.
+    Returns tuple: (queries: list[str], core_entities: list[str])
+    """
+    combined = f"{trending_keyword} {headline}".strip()
+    words = combined.split()
 
-    unique_words = []
-    seen = set()
-    for w in meaningful:
-        if w.lower() not in seen:
-            seen.add(w.lower())
-            unique_words.append(w)
+    proper_nouns = []
+    current_pn = []
 
+    for w in words:
+        clean_w = re.sub(r'[^\w-]', '', w)
+        if not clean_w:
+            continue
+        clean_lower = clean_w.lower()
+        if (clean_w[0].isupper() or any(c.isdigit() for c in clean_w) or clean_lower == 'vs') and clean_lower not in STOP_WORDS:
+            current_pn.append(clean_w)
+        else:
+            if current_pn:
+                proper_nouns.append(' '.join(current_pn))
+                current_pn = []
+    if current_pn:
+        proper_nouns.append(' '.join(current_pn))
+
+    cleaned_all = re.sub(r'[^\w\s]', ' ', combined)
+    meaningful = [w for w in cleaned_all.split() if w.lower() not in STOP_WORDS and len(w) > 2 and not w.isdigit()]
+
+    core_entities = []
     queries = []
-    if len(unique_words) >= 3:
-        queries.append(" ".join(unique_words[:3]))
-    if len(unique_words) >= 2:
-        queries.append(" ".join(unique_words[:2]))
-    if unique_words:
-        queries.append(unique_words[0])
 
-    if trending_keyword and trending_keyword.strip():
-        tk_clean = re.sub(r'[^\w\s]', ' ', trending_keyword).strip()
-        if tk_clean and tk_clean not in queries:
-            queries.insert(0, tk_clean)
+    for pn in proper_nouns:
+        pn_words = [w for w in pn.split() if w.lower() not in STOP_WORDS or w.lower() in ['vs', 'iphone', 'ipad', 'macbook']]
+        if pn_words:
+            clean_pn = ' '.join(pn_words)
+            if len(clean_pn) > 2:
+                queries.append(clean_pn)
+                for w in pn_words:
+                    if w.lower() not in STOP_WORDS and len(w) > 2 and not w.isdigit():
+                        core_entities.append(w.lower())
 
-    return list(dict.fromkeys(queries))
+    for m in meaningful:
+        if m.lower() not in core_entities:
+            core_entities.append(m.lower())
 
-def fetch_unsplash_api_image(query: str, access_key: str) -> str:
-    """Queries Unsplash API using access_key."""
+    primary_entity = core_entities[0] if core_entities else ""
+    if primary_entity:
+        if primary_entity == "iphone":
+            queries.insert(0, "iPhone smartphone")
+        elif primary_entity in ["dune"]:
+            queries.insert(0, f"{primary_entity.title()} movie")
+        elif category == "Sports" or primary_entity in ["india", "australia", "test"]:
+            queries.insert(0, "India vs Australia cricket" if ("india" in core_entities or "australia" in core_entities) else f"{primary_entity.title()} cricket")
+        elif category in ["Tech", "AI"] and primary_entity == "nvidia":
+            queries.insert(0, "Nvidia technology")
+
+    if len(core_entities) >= 2:
+        queries.append(" ".join([e.title() for e in core_entities[:2]]))
+    if core_entities:
+        queries.append(core_entities[0].title())
+
+    seen = set()
+    final_queries = []
+    for q in queries:
+        q_norm = q.lower().strip()
+        if q_norm and q_norm not in seen:
+            seen.add(q_norm)
+            final_queries.append(q)
+
+    unique_entities = list(dict.fromkeys(core_entities))
+    return final_queries, unique_entities
+
+def is_image_relevant(img_metadata: str, core_entities: list, category: str = "Tech") -> bool:
+    """Verifies image metadata against core entity terms and category context."""
+    if not img_metadata:
+        return False
+    meta_lower = img_metadata.lower()
+
+    # Disambiguation for movie/entertainment titles (e.g. Dune movie vs sand dune)
+    movie_context = any(m in meta_lower for m in ["movie", "film", "cinema", "theater", "poster", "actor", "hollywood", "box office", "director"])
+    if "dune" in core_entities and not movie_context:
+        return False
+
+    if core_entities:
+        for entity in core_entities:
+            ent_lower = entity.lower()
+            if len(ent_lower) >= 3 and ent_lower in meta_lower:
+                return True
+            syns = SYNONYMS.get(ent_lower, [])
+            for syn in syns:
+                if syn in meta_lower:
+                    return True
+        return False
+
+    category_keywords = {
+        "Tech": ["technology", "tech", "phone", "computer", "device", "electronic", "chip", "software", "gadget"],
+        "AI": ["ai", "robot", "chip", "technology", "artificial", "computing", "network"],
+        "Sports": ["sport", "stadium", "cricket", "ball", "match", "player", "arena"],
+        "Business": ["business", "finance", "market", "office", "company", "trade"],
+        "World": ["world", "global", "news", "city", "movie", "film", "cinema"]
+    }
+
+    cat_words = category_keywords.get(category, [])
+    for cw in cat_words:
+        if cw in meta_lower:
+            return True
+
+    return False
+
+def fetch_unsplash_api_image(query: str, access_key: str, core_entities: list, category: str) -> str:
+    """Queries Unsplash API using access_key with relevance check."""
     if not access_key or not query:
         return None
     try:
         encoded = urllib.parse.quote(query)
         url = f"https://api.unsplash.com/search/photos?query={encoded}&per_page=3&orientation=landscape"
+        print(f"[+] [IMAGE SEARCH] Querying Unsplash API with query: '{query}'")
         req = urllib.request.Request(url, headers={"Authorization": f"Client-ID {access_key}", "User-Agent": "Nexnews/1.0"})
         with urllib.request.urlopen(req, timeout=8) as res:
             if res.status == 200:
                 data = json.loads(res.read().decode("utf-8"))
                 results = data.get("results", [])
-                if results:
-                    return results[0].get("urls", {}).get("regular")
+                for photo in results:
+                    img_url = photo.get("urls", {}).get("regular")
+                    alt = photo.get("alt_description") or photo.get("description") or ""
+                    metadata = f"{alt} {query}"
+                    if img_url and is_image_relevant(metadata, core_entities, category):
+                        print(f"[+] [IMAGE SEARCH] Unsplash result accepted for '{query}': '{alt}' -> {img_url}")
+                        return img_url
+                    else:
+                        print(f"[-] [IMAGE SEARCH] Unsplash result rejected by relevance check for query '{query}': '{alt}'")
     except Exception as e:
         print(f"[-] [IMAGE SEARCH] Unsplash API query error for '{query}': {e}")
     return None
 
-def fetch_pexels_api_image(query: str, api_key: str) -> str:
-    """Queries Pexels API using api_key."""
+def fetch_pexels_api_image(query: str, api_key: str, core_entities: list, category: str) -> str:
+    """Queries Pexels API using api_key with relevance check."""
     if not api_key or not query:
         return None
     try:
         encoded = urllib.parse.quote(query)
         url = f"https://api.pexels.com/v1/search?query={encoded}&per_page=3&orientation=landscape"
+        print(f"[+] [IMAGE SEARCH] Querying Pexels API with query: '{query}'")
         req = urllib.request.Request(url, headers={"Authorization": api_key, "User-Agent": "Nexnews/1.0"})
         with urllib.request.urlopen(req, timeout=8) as res:
             if res.status == 200:
                 data = json.loads(res.read().decode("utf-8"))
                 photos = data.get("photos", [])
-                if photos:
-                    src = photos[0].get("src", {})
-                    return src.get("landscape") or src.get("large2x") or src.get("large")
+                for photo in photos:
+                    src = photo.get("src", {})
+                    img_url = src.get("landscape") or src.get("large2x") or src.get("large")
+                    alt = photo.get("alt") or photo.get("url") or ""
+                    metadata = f"{alt} {query}"
+                    if img_url and is_image_relevant(metadata, core_entities, category):
+                        print(f"[+] [IMAGE SEARCH] Pexels result accepted for '{query}': '{alt}' -> {img_url}")
+                        return img_url
+                    else:
+                        print(f"[-] [IMAGE SEARCH] Pexels result rejected by relevance check for query '{query}': '{alt}'")
     except Exception as e:
         print(f"[-] [IMAGE SEARCH] Pexels API query error for '{query}': {e}")
     return None
 
-def fetch_wikimedia_image(query: str) -> str:
-    """Queries Wikimedia Commons API for a topically relevant raster image."""
+def fetch_wikimedia_image(query: str, core_entities: list, category: str) -> str:
+    """Queries Wikimedia Commons API for a topically relevant raster image with relevance check."""
     if not query:
         return None
     try:
         encoded = urllib.parse.quote(query)
         url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={encoded}&gsrnamespace=6&gsrlimit=8&prop=imageinfo&iiprop=url|mime&format=json"
+        print(f"[+] [IMAGE SEARCH] Querying Wikimedia Commons API with query: '{query}'")
         req = urllib.request.Request(url, headers={"User-Agent": "NexnewsBot/1.0 (https://nexnews.vercel.app)"})
         with urllib.request.urlopen(req, timeout=8) as res:
             if res.status == 200:
@@ -248,8 +368,14 @@ def fetch_wikimedia_image(query: str) -> str:
                     if ii:
                         img_url = ii[0].get("url", "")
                         mime = ii[0].get("mime", "")
+                        title = page.get("title", "")
+                        metadata = f"{title} {img_url}"
                         if mime in ["image/jpeg", "image/png", "image/webp"] and not any(x in img_url.lower() for x in [".svg", ".tif", "coin.jpg", "logo", "icon", "map"]):
-                            return img_url
+                            if is_image_relevant(metadata, core_entities, category):
+                                print(f"[+] [IMAGE SEARCH] Wikimedia result accepted for '{query}': '{title}' -> {img_url}")
+                                return img_url
+                            else:
+                                print(f"[-] [IMAGE SEARCH] Wikimedia result rejected by relevance check for query '{query}': '{title}'")
     except Exception as e:
         print(f"[-] [IMAGE SEARCH] Wikimedia search error for '{query}': {e}")
     return None
@@ -263,25 +389,28 @@ def fetch_article_image(headline: str, trending_keyword: str = "", category: str
     unsplash_key = os.environ.get("UNSPLASH_ACCESS_KEY")
     pexels_key = os.environ.get("PEXELS_API_KEY")
 
-    queries = extract_search_keywords(headline, trending_keyword, category)
+    queries, core_entities = extract_search_keywords(headline, trending_keyword, category)
+    print(f"[+] [IMAGE SEARCH] Headline: '{headline}' | Category: '{category}'")
+    print(f"[+] [IMAGE SEARCH] Extracted search queries: {queries}")
+    print(f"[+] [IMAGE SEARCH] Core entity terms: {core_entities}")
 
     for query in queries:
         # 1. Try Unsplash API if key exists
         if unsplash_key:
-            img_url = fetch_unsplash_api_image(query, unsplash_key)
+            img_url = fetch_unsplash_api_image(query, unsplash_key, core_entities, category)
             if img_url:
                 print(f"[+] [IMAGE SEARCH] Found keyword image via Unsplash API for '{query}': {img_url}")
                 return img_url, f"Visual representation for '{headline}' ({query})"
 
         # 2. Try Pexels API if key exists
         if pexels_key:
-            img_url = fetch_pexels_api_image(query, pexels_key)
+            img_url = fetch_pexels_api_image(query, pexels_key, core_entities, category)
             if img_url:
                 print(f"[+] [IMAGE SEARCH] Found keyword image via Pexels API for '{query}': {img_url}")
                 return img_url, f"Visual representation for '{headline}' ({query})"
 
         # 3. Try Wikimedia Commons search
-        img_url = fetch_wikimedia_image(query)
+        img_url = fetch_wikimedia_image(query, core_entities, category)
         if img_url:
             print(f"[+] [IMAGE SEARCH] Found keyword image via Wikimedia for '{query}': {img_url}")
             return img_url, f"Media coverage visual for '{headline}'"
@@ -289,7 +418,7 @@ def fetch_article_image(headline: str, trending_keyword: str = "", category: str
     # 4. Fallback path to category default
     default_url = CATEGORY_IMAGES.get(category, CATEGORY_IMAGES["Tech"])
     first_q = queries[0] if queries else (trending_keyword or headline)
-    print(f"[-] [IMAGE SEARCH] Keyword search failed/returned no results for '{first_q}'. Falling back to '{category}' category default: {default_url}")
+    print(f"[-] [IMAGE SEARCH] Keyword search failed/returned no relevant results for '{first_q}'. Falling back to '{category}' category default: {default_url}")
 
     return default_url, f"Category visual for '{headline}' ({category})"
 

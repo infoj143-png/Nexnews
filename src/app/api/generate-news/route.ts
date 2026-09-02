@@ -16,44 +16,192 @@ const STOP_WORDS = new Set([
   'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
   'should', 'could', 'can', 'may', 'might', 'must', 'shall', 'this', 'that', 'these',
   'those', 'trending', 'search', 'analysis', 'news', 'vs', 'versus', 'live', 'today',
-  '2024', '2025', '2026', '2027', 'day', 'match', 'scorecard', 'update', 'updates'
+  'yesterday', 'tomorrow', '2024', '2025', '2026', '2027', '2028', 'day', 'days',
+  'month', 'months', 'week', 'weeks', 'year', 'years', 'time', 'schedule', 'update',
+  'updates', 'updated', 'start', 'starts', 'started', 'starting', 'later', 'earlier',
+  'usual', 'unusual', 'delay', 'delayed', 'delays', 'release', 'releases', 'released',
+  'releasing', 'launch', 'launches', 'launched', 'launching', 'announce', 'announces',
+  'announced', 'announcing', 'unveil', 'unveils', 'unveiled', 'leak', 'leaks', 'leaked',
+  'rumor', 'rumors', 'report', 'reports', 'reported', 'says', 'say', 'according',
+  'pre', 'post', 'order', 'orders', 'price', 'cost', 'buy', 'sale', 'sales', 'stock',
+  'shares', 'market', 'deal', 'best', 'worst', 'high', 'low', 'big', 'more', 'most',
+  'show', 'shows', 'watch', 'match', 'game', 'scorecard', 'win', 'wins', 'won', 'lost',
+  'loss', 'beat', 'beats', 'box', 'office', 'weekend', 'gross', 'earns', 'earned',
+  'pro', 'max', 'mini', 'plus', 'ultra', 'lite', 'first', 'second', 'new', 'latest',
+  'top', 'hn', 'opentie', 'openxwa', 'breaking', 'than', 'then', 'other', 'another',
+  'each', 'every', 'some', 'any', 'all', 'both', 'few', 'such', 'no', 'nor', 'not',
+  'only', 'own', 'same', 'so', 'too', 'very', 'just'
 ]);
 
-function extractKeywords(title: string, topic: string): string[] {
-  const combined = `${topic} ${title}`;
-  const cleaned = combined.replace(/[^\w\s]/g, ' ');
-  const words = cleaned.split(/\s+/).filter(w => w.length > 2 && !STOP_WORDS.has(w.toLowerCase()) && !/^\d+$/.test(w));
-  const uniqueWords: string[] = [];
-  const seen = new Set<string>();
+const SYNONYMS: Record<string, string[]> = {
+  iphone: ['iphone', 'apple', 'smartphone', 'mobile', 'ios'],
+  ipad: ['ipad', 'apple', 'tablet'],
+  macbook: ['macbook', 'apple', 'laptop'],
+  nvidia: ['nvidia', 'chip', 'gpu', 'semiconductor', 'technology', 'ai'],
+  dune: ['dune', 'movie', 'film', 'cinema', 'theater', 'poster', 'actor'],
+  cricket: ['cricket', 'stadium', 'match', 'batsman', 'bowler', 'wicket', 'sports'],
+  india: ['india', 'cricket', 'indian', 'stadium', 'delhi', 'mumbai'],
+  australia: ['australia', 'cricket', 'australian', 'stadium', 'sydney', 'melbourne']
+};
+
+function extractKeywords(title: string, topic: string, category: Category): { queries: string[]; coreEntities: string[] } {
+  const combined = `${topic} ${title}`.trim();
+  const words = combined.split(/\s+/);
+
+  const properNouns: string[] = [];
+  let currentPn: string[] = [];
+
   for (const w of words) {
-    if (!seen.has(w.toLowerCase())) {
-      seen.add(w.toLowerCase());
-      uniqueWords.push(w);
+    const cleanW = w.replace(/[^\w-]/g, '');
+    if (!cleanW) continue;
+    const cleanLower = cleanW.toLowerCase();
+    if ((/^[A-Z]/.test(cleanW) || /\d/.test(cleanW) || cleanLower === 'vs') && !STOP_WORDS.has(cleanLower)) {
+      currentPn.push(cleanW);
+    } else {
+      if (currentPn.length > 0) {
+        properNouns.push(currentPn.join(' '));
+        currentPn = [];
+      }
     }
   }
+  if (currentPn.length > 0) {
+    properNouns.push(currentPn.join(' '));
+  }
+
+  const cleanedAll = combined.replace(/[^\w\s]/g, ' ');
+  const meaningful = cleanedAll.split(/\s+/).filter(w => w.length > 2 && !STOP_WORDS.has(w.toLowerCase()) && !/^\d+$/.test(w));
+
+  const coreEntities: string[] = [];
   const queries: string[] = [];
-  if (uniqueWords.length >= 3) queries.push(uniqueWords.slice(0, 3).join(' '));
-  if (uniqueWords.length >= 2) queries.push(uniqueWords.slice(0, 2).join(' '));
-  if (uniqueWords.length >= 1) queries.push(uniqueWords[0]);
-  return Array.from(new Set(queries));
+
+  for (const pn of properNouns) {
+    const pnWords = pn.split(/\s+/).filter(w => !STOP_WORDS.has(w.toLowerCase()) || ['vs', 'iphone', 'ipad', 'macbook'].includes(w.toLowerCase()));
+    if (pnWords.length > 0) {
+      const cleanPn = pnWords.join(' ');
+      if (cleanPn.length > 2) {
+        queries.push(cleanPn);
+        for (const w of pnWords) {
+          if (!STOP_WORDS.has(w.toLowerCase()) && w.length > 2 && !/^\d+$/.test(w)) {
+            coreEntities.push(w.toLowerCase());
+          }
+        }
+      }
+    }
+  }
+
+  for (const m of meaningful) {
+    if (!coreEntities.includes(m.toLowerCase())) {
+      coreEntities.push(m.toLowerCase());
+    }
+  }
+
+  const primaryEntity = coreEntities[0] || '';
+  if (primaryEntity) {
+    if (primaryEntity === 'iphone') {
+      queries.unshift('iPhone smartphone');
+    } else if (primaryEntity === 'dune') {
+      queries.unshift('Dune movie');
+    } else if (category === 'Sports' || ['india', 'australia', 'test'].includes(primaryEntity)) {
+      queries.unshift((coreEntities.includes('india') || coreEntities.includes('australia')) ? 'India vs Australia cricket' : `${primaryEntity.charAt(0).toUpperCase() + primaryEntity.slice(1)} cricket`);
+    } else if (['Tech', 'AI'].includes(category) && primaryEntity === 'nvidia') {
+      queries.unshift('Nvidia technology');
+    }
+  }
+
+  if (coreEntities.length >= 2) {
+    queries.push(coreEntities.slice(0, 2).map(e => e.charAt(0).toUpperCase() + e.slice(1)).join(' '));
+  }
+  if (coreEntities.length >= 1) {
+    queries.push(coreEntities[0].charAt(0).toUpperCase() + coreEntities[0].slice(1));
+  }
+
+  const seen = new Set<string>();
+  const finalQueries: string[] = [];
+  for (const q of queries) {
+    const qNorm = q.toLowerCase().trim();
+    if (qNorm && !seen.has(qNorm)) {
+      seen.add(qNorm);
+      finalQueries.push(q);
+    }
+  }
+
+  const uniqueEntities = Array.from(new Set(coreEntities));
+  return { queries: finalQueries, coreEntities: uniqueEntities };
+}
+
+function isImageRelevant(imgMetadata: string, coreEntities: string[], category: Category): boolean {
+  if (!imgMetadata) return false;
+  const metaLower = imgMetadata.toLowerCase();
+
+  // Disambiguation for movie/entertainment titles (e.g. Dune movie vs sand dune)
+  const movieContext = ['movie', 'film', 'cinema', 'theater', 'poster', 'actor', 'hollywood', 'box office', 'director'].some(m => metaLower.includes(m));
+  if (coreEntities.includes('dune') && !movieContext) {
+    return false;
+  }
+
+  if (coreEntities.length > 0) {
+    for (const entity of coreEntities) {
+      const entLower = entity.toLowerCase();
+      if (entLower.length >= 3 && metaLower.includes(entLower)) {
+        return true;
+      }
+      const syns = SYNONYMS[entLower] || [];
+      for (const syn of syns) {
+        if (metaLower.includes(syn)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  const categoryKeywords: Record<Category, string[]> = {
+    Tech: ['technology', 'tech', 'phone', 'computer', 'device', 'electronic', 'chip', 'software', 'gadget'],
+    AI: ['ai', 'robot', 'chip', 'technology', 'artificial', 'computing', 'network'],
+    Sports: ['sport', 'stadium', 'cricket', 'ball', 'match', 'player', 'arena'],
+    Business: ['business', 'finance', 'market', 'office', 'company', 'trade'],
+    World: ['world', 'global', 'news', 'city', 'movie', 'film', 'cinema']
+  };
+
+  const catWords = categoryKeywords[category] || [];
+  for (const cw of catWords) {
+    if (metaLower.includes(cw)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 async function fetchArticleImage(title: string, topic: string, category: Category): Promise<{ url: string; caption: string }> {
   const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
   const pexelsKey = process.env.PEXELS_API_KEY;
-  const queries = extractKeywords(title, topic);
+  const { queries, coreEntities } = extractKeywords(title, topic, category);
+
+  console.log(`[+] [IMAGE SEARCH] Title: '${title}' | Category: '${category}'`);
+  console.log(`[+] [IMAGE SEARCH] Extracted search queries: ${JSON.stringify(queries)}`);
+  console.log(`[+] [IMAGE SEARCH] Core entity terms: ${JSON.stringify(coreEntities)}`);
 
   for (const q of queries) {
     if (unsplashKey) {
       try {
+        console.log(`[+] [IMAGE SEARCH] Querying Unsplash API with query: '${q}'`);
         const res = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&per_page=3&orientation=landscape`, {
           headers: { 'Authorization': `Client-ID ${unsplashKey}` }
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.results && data.results.length > 0) {
-            console.log(`[+] [IMAGE SEARCH] Found keyword image via Unsplash API for '${q}'`);
-            return { url: data.results[0].urls.regular, caption: `Visual representation for ${title} (${q})` };
+          const results = data.results || [];
+          for (const photo of results) {
+            const imgUrl = photo.urls?.regular;
+            const alt = photo.alt_description || photo.description || '';
+            const metadata = alt;
+            if (imgUrl && isImageRelevant(metadata, coreEntities, category)) {
+              console.log(`[+] [IMAGE SEARCH] Unsplash result accepted for '${q}': '${alt}' -> ${imgUrl}`);
+              return { url: imgUrl, caption: `Visual representation for ${title} (${q})` };
+            } else {
+              console.log(`[-] [IMAGE SEARCH] Unsplash result rejected by relevance check for query '${q}': '${alt}'`);
+            }
           }
         }
       } catch (err) {
@@ -63,14 +211,23 @@ async function fetchArticleImage(title: string, topic: string, category: Categor
 
     if (pexelsKey) {
       try {
+        console.log(`[+] [IMAGE SEARCH] Querying Pexels API with query: '${q}'`);
         const res = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=3&orientation=landscape`, {
           headers: { 'Authorization': pexelsKey }
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.photos && data.photos.length > 0) {
-            console.log(`[+] [IMAGE SEARCH] Found keyword image via Pexels API for '${q}'`);
-            return { url: data.photos[0].src.landscape || data.photos[0].src.large2x, caption: `Visual representation for ${title} (${q})` };
+          const photos = data.photos || [];
+          for (const photo of photos) {
+            const imgUrl = photo.src?.landscape || photo.src?.large2x || photo.src?.large;
+            const alt = photo.alt || photo.url || '';
+            const metadata = alt;
+            if (imgUrl && isImageRelevant(metadata, coreEntities, category)) {
+              console.log(`[+] [IMAGE SEARCH] Pexels result accepted for '${q}': '${alt}' -> ${imgUrl}`);
+              return { url: imgUrl, caption: `Visual representation for ${title} (${q})` };
+            } else {
+              console.log(`[-] [IMAGE SEARCH] Pexels result rejected by relevance check for query '${q}': '${alt}'`);
+            }
           }
         }
       } catch (err) {
@@ -79,6 +236,7 @@ async function fetchArticleImage(title: string, topic: string, category: Categor
     }
 
     try {
+      console.log(`[+] [IMAGE SEARCH] Querying Wikimedia Commons API with query: '${q}'`);
       const res = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrnamespace=6&gsrlimit=8&prop=imageinfo&iiprop=url|mime&format=json`, {
         headers: { 'User-Agent': 'NexnewsBot/1.0 (https://nexnews.vercel.app)' }
       });
@@ -90,9 +248,15 @@ async function fetchArticleImage(title: string, topic: string, category: Categor
           if (ii && ii.length > 0) {
             const imgUrl = ii[0].url;
             const mime = ii[0].mime;
+            const pageTitle = pages[pid].title || '';
+            const metadata = `${pageTitle} ${imgUrl}`;
             if (['image/jpeg', 'image/png', 'image/webp'].includes(mime) && !['.svg', '.tif', 'coin.jpg', 'logo', 'icon', 'map'].some(x => imgUrl.toLowerCase().includes(x))) {
-              console.log(`[+] [IMAGE SEARCH] Found keyword image via Wikimedia for '${q}'`);
-              return { url: imgUrl, caption: `Media coverage visual for ${title}` };
+              if (isImageRelevant(metadata, coreEntities, category)) {
+                console.log(`[+] [IMAGE SEARCH] Wikimedia result accepted for '${q}': '${pageTitle}' -> ${imgUrl}`);
+                return { url: imgUrl, caption: `Media coverage visual for ${title}` };
+              } else {
+                console.log(`[-] [IMAGE SEARCH] Wikimedia result rejected by relevance check for query '${q}': '${pageTitle}'`);
+              }
             }
           }
         }
@@ -103,7 +267,7 @@ async function fetchArticleImage(title: string, topic: string, category: Categor
   }
 
   const defaultUrl = categoryImages[category] || categoryImages.Tech;
-  console.log(`[-] [IMAGE SEARCH] Keyword search failed/returned no results for '${queries[0] || topic}'. Falling back to '${category}' category default: ${defaultUrl}`);
+  console.log(`[-] [IMAGE SEARCH] Keyword search failed/returned no relevant results for '${queries[0] || topic}'. Falling back to '${category}' category default: ${defaultUrl}`);
   return { url: defaultUrl, caption: `Category visual for ${title}` };
 }
 
