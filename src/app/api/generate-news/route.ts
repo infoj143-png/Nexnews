@@ -7,8 +7,105 @@ const categoryImages: Record<Category, string> = {
   Tech: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80',
   World: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80',
   Business: 'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1200&q=80',
-  Sports: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80'
+  Sports: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1200&q=80'
 };
+
+const STOP_WORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
+  'by', 'from', 'up', 'about', 'into', 'over', 'after', 'is', 'are', 'was', 'were',
+  'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would',
+  'should', 'could', 'can', 'may', 'might', 'must', 'shall', 'this', 'that', 'these',
+  'those', 'trending', 'search', 'analysis', 'news', 'vs', 'versus', 'live', 'today',
+  '2024', '2025', '2026', '2027', 'day', 'match', 'scorecard', 'update', 'updates'
+]);
+
+function extractKeywords(title: string, topic: string): string[] {
+  const combined = `${topic} ${title}`;
+  const cleaned = combined.replace(/[^\w\s]/g, ' ');
+  const words = cleaned.split(/\s+/).filter(w => w.length > 2 && !STOP_WORDS.has(w.toLowerCase()) && !/^\d+$/.test(w));
+  const uniqueWords: string[] = [];
+  const seen = new Set<string>();
+  for (const w of words) {
+    if (!seen.has(w.toLowerCase())) {
+      seen.add(w.toLowerCase());
+      uniqueWords.push(w);
+    }
+  }
+  const queries: string[] = [];
+  if (uniqueWords.length >= 3) queries.push(uniqueWords.slice(0, 3).join(' '));
+  if (uniqueWords.length >= 2) queries.push(uniqueWords.slice(0, 2).join(' '));
+  if (uniqueWords.length >= 1) queries.push(uniqueWords[0]);
+  return Array.from(new Set(queries));
+}
+
+async function fetchArticleImage(title: string, topic: string, category: Category): Promise<{ url: string; caption: string }> {
+  const unsplashKey = process.env.UNSPLASH_ACCESS_KEY;
+  const pexelsKey = process.env.PEXELS_API_KEY;
+  const queries = extractKeywords(title, topic);
+
+  for (const q of queries) {
+    if (unsplashKey) {
+      try {
+        const res = await fetch(`https://api.unsplash.com/search/photos?query=${encodeURIComponent(q)}&per_page=3&orientation=landscape`, {
+          headers: { 'Authorization': `Client-ID ${unsplashKey}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.results && data.results.length > 0) {
+            console.log(`[+] [IMAGE SEARCH] Found keyword image via Unsplash API for '${q}'`);
+            return { url: data.results[0].urls.regular, caption: `Visual representation for ${title} (${q})` };
+          }
+        }
+      } catch (err) {
+        console.warn(`[-] [IMAGE SEARCH] Unsplash API error for '${q}':`, err);
+      }
+    }
+
+    if (pexelsKey) {
+      try {
+        const res = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=3&orientation=landscape`, {
+          headers: { 'Authorization': pexelsKey }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.photos && data.photos.length > 0) {
+            console.log(`[+] [IMAGE SEARCH] Found keyword image via Pexels API for '${q}'`);
+            return { url: data.photos[0].src.landscape || data.photos[0].src.large2x, caption: `Visual representation for ${title} (${q})` };
+          }
+        }
+      } catch (err) {
+        console.warn(`[-] [IMAGE SEARCH] Pexels API error for '${q}':`, err);
+      }
+    }
+
+    try {
+      const res = await fetch(`https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=${encodeURIComponent(q)}&gsrnamespace=6&gsrlimit=8&prop=imageinfo&iiprop=url|mime&format=json`, {
+        headers: { 'User-Agent': 'NexnewsBot/1.0 (https://nexnews.vercel.app)' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const pages = data.query?.pages || {};
+        for (const pid of Object.keys(pages)) {
+          const ii = pages[pid].imageinfo;
+          if (ii && ii.length > 0) {
+            const imgUrl = ii[0].url;
+            const mime = ii[0].mime;
+            if (['image/jpeg', 'image/png', 'image/webp'].includes(mime) && !['.svg', '.tif', 'coin.jpg', 'logo', 'icon', 'map'].some(x => imgUrl.toLowerCase().includes(x))) {
+              console.log(`[+] [IMAGE SEARCH] Found keyword image via Wikimedia for '${q}'`);
+              return { url: imgUrl, caption: `Media coverage visual for ${title}` };
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[-] [IMAGE SEARCH] Wikimedia search error for '${q}':`, err);
+    }
+  }
+
+  const defaultUrl = categoryImages[category] || categoryImages.Tech;
+  console.log(`[-] [IMAGE SEARCH] Keyword search failed/returned no results for '${queries[0] || topic}'. Falling back to '${category}' category default: ${defaultUrl}`);
+  return { url: defaultUrl, caption: `Category visual for ${title}` };
+}
 
 const VALID_CATEGORIES: Category[] = ['Tech', 'World', 'Business', 'AI', 'Sports'];
 
@@ -211,6 +308,8 @@ export async function POST(request: Request) {
       ? generatedData.tags
       : [finalCategory, 'AI-Generated', 'News'];
 
+    const { url: imageUrl, caption: imageCaption } = await fetchArticleImage(title, topic, finalCategory);
+
     const newArticle = addArticle({
       title,
       slug,
@@ -224,8 +323,8 @@ export async function POST(request: Request) {
       },
       publishedAt: new Date().toISOString(),
       readTime: '4 min read',
-      imageUrl: categoryImages[finalCategory] || categoryImages.Tech,
-      imageCaption: `AI-generated visual representation for ${topic}`,
+      imageUrl,
+      imageCaption,
       isFeatured: false,
       isTrending: true,
       isBreaking: true,
