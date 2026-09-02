@@ -511,7 +511,7 @@ export async function POST(request: Request) {
 
     const { url: imageUrl, caption: imageCaption } = await fetchArticleImage(title, topic, finalCategory);
 
-    const newArticle = addArticle({
+    const newArticle = await addArticle({
       title,
       slug,
       summary,

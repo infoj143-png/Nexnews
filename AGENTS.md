@@ -12,9 +12,9 @@ Nexnews is an autonomous Next.js 16 (App Router) news publishing platform deploy
 
 ## Design Decisions & Persistence Behavior
 1. **No Manual Review Gate:** Articles are published live immediately upon generation to capture real-time search velocity while trends are hot. Do not introduce an approval gate or moderation queue.
-2. **File-Based Persistence:**
+2. **File-Based & GitHub API Persistence:**
    - **Python Cron Pipeline (`scripts/auto_news.py`):** Durably persists articles by creating `data/articles/<slug>.json` and committing the JSON files directly to the Git repository via GitHub Actions workflow.
-   - **Next.js Admin UI & API Routes (`addArticle` in `src/lib/data.ts` / `/api/generate-news` / `/api/articles`):** Writes `data/articles/<slug>.json` to local serverless filesystem disk in addition to in-memory state. In serverless deployments (Vercel), local disk writes persist to that specific execution container instance; durable repo-wide persistence across redeployments relies on Python pipeline repository commits.
+   - **Next.js Admin UI & API Routes (`addArticle` & `deleteArticle` in `src/lib/data.ts` / `/api/generate-news` / `/api/articles`):** Commits or removes `data/articles/<slug>.json` directly in the Git repository using the GitHub REST API (`PUT` / `DELETE /repos/{owner}/{repo}/contents/{path}`). In addition, if `VERCEL_DEPLOY_HOOK_URL` is configured, it triggers an automatic Vercel redeploy. Local disk write/unlink operations are also attempted for in-memory and local development environments.
 
 ## Environment Variables Required
 * `ADMIN_SESSION_SECRET` - Server-only secret key for signing admin JWT cookies.

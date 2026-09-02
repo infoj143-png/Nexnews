@@ -335,17 +335,13 @@ export function searchArticles(query: string): Article[] {
 }
 
 import { sanitizeHtml } from './sanitize';
+import { saveArticleToGitHub, deleteArticleFromGitHub } from './github';
 
 /**
- * Adds an article to in-memory state and persists to disk under `data/articles/<slug>.json`.
- *
- * NOTE ON SERVERLESS PERSISTENCE:
- * In a serverless environment like Vercel, writing to the filesystem persists to the ephemeral local filesystem
- * of that specific serverless invocation instance. It survives across requests on that instance, but will not
- * automatically be committed to Git or shared across serverless cold starts. The automated Python pipeline
- * (`scripts/auto_news.py` via GitHub Actions) remains the primary method for Git-committed durable articles.
+ * Adds an article to in-memory state, attempts local disk write, and commits the JSON
+ * file to GitHub via REST API for serverless persistence on Vercel.
  */
-export function addArticle(article: Omit<Article, 'id' | 'views'>): Article {
+export async function addArticle(article: Omit<Article, 'id' | 'views'>): Promise<Article> {
   const sanitizedContent = sanitizeHtml(article.content);
   const newArticle: Article = {
     ...article,
@@ -364,7 +360,13 @@ export function addArticle(article: Omit<Article, 'id' | 'views'>): Article {
         fs.writeFileSync(filePath, JSON.stringify(newArticle, null, 2), 'utf8');
       }
     } catch (err) {
-      console.error('[addArticle] Error writing article JSON to disk:', err);
+      console.error('[addArticle] Local disk write notice (expected in read-only serverless environment):', err);
+    }
+
+    try {
+      await saveArticleToGitHub(newArticle);
+    } catch (ghErr) {
+      console.error('[addArticle] Failed to save article to GitHub:', ghErr);
     }
   }
 
@@ -378,13 +380,21 @@ export function updateArticle(id: string, updates: Partial<Article>): Article | 
   return initialArticles[index];
 }
 
-export function deleteArticle(id: string): boolean {
+export async function deleteArticle(id: string): Promise<boolean> {
   let deleted = false;
+  let targetSlug: string | null = null;
+
+  const targetArticle = initialArticles.find(a => a.id === id || a.slug === id);
+  if (targetArticle) {
+    targetSlug = targetArticle.slug;
+  }
+
   const initialLen = initialArticles.length;
-  initialArticles = initialArticles.filter(a => a.id !== id);
+  initialArticles = initialArticles.filter(a => a.id !== id && a.slug !== id);
   if (initialArticles.length < initialLen) {
     deleted = true;
   }
+
   if (typeof window === 'undefined') {
     try {
       const res = getArticlesDirectory();
@@ -397,7 +407,14 @@ export function deleteArticle(id: string): boolean {
             const raw = fs.readFileSync(filePath, 'utf8');
             const parsed = JSON.parse(raw);
             if (parsed && (parsed.id === id || parsed.slug === id)) {
-              fs.unlinkSync(filePath);
+              if (!targetSlug && parsed.slug) {
+                targetSlug = parsed.slug;
+              }
+              try {
+                fs.unlinkSync(filePath);
+              } catch (unlinkErr) {
+                console.error('[deleteArticle] Local disk unlink notice:', unlinkErr);
+              }
               deleted = true;
             }
           }
@@ -405,6 +422,16 @@ export function deleteArticle(id: string): boolean {
       }
     } catch (err) {
       console.error('Error deleting file article:', err);
+    }
+
+    const slugToDelete = targetSlug || id;
+    try {
+      const ghDeleted = await deleteArticleFromGitHub(slugToDelete);
+      if (ghDeleted) {
+        deleted = true;
+      }
+    } catch (ghErr) {
+      console.error('[deleteArticle] Failed to delete article from GitHub:', ghErr);
     }
   }
   return deleted;
