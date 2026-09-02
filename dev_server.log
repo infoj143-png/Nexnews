@@ -5,16 +5,15 @@
 ▲ Next.js 16.3.3 (Turbopack)
 - Local:         http://localhost:3000
 - Network:       http://192.168.0.2:3000
-✓ Ready in 545ms
+✓ Ready in 562ms
 [@sentry/nextjs] Importing `withSentryConfig` from `@sentry/nextjs` is deprecated and will stop working in v11. Import it from `@sentry/nextjs/config` instead:
   import { withSentryConfig } from '@sentry/nextjs/config';
-✓ Running next.config.ts took 724ms
+✓ Running next.config.ts took 713ms
 - Experiments (use with caution):
   · clientTraceMetadata
 
-○ Compiling / ...
- HEAD / 200 in 4.1s (next.js: 3.5s, application-code: 554ms)
- GET / 200 in 248ms (next.js: 15ms, application-code: 234ms)
+ HEAD / 200 in 3.4s (next.js: 2.9s, application-code: 523ms)
+ GET / 200 in 253ms (next.js: 14ms, application-code: 238ms)
 [browser] Uncaught Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
 
 - A server/client branch `if (typeof window !== 'undefined')`.
@@ -28,76 +27,50 @@ It can also happen if the client has a browser extension installed which messes 
 https://react.dev/link/hydration-mismatch
 
   ...
-    <DevRootHTTPAccessFallbackBoundary>
-      <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
-        <HTTPAccessFallbackErrorBoundary pathname="/" notFound={<NotAllowedRootHTTPFallbackError>} forbidden={undefined} ...>
-          <RedirectBoundary>
-            <RedirectErrorBoundary router={{...}}>
-              <Head>
-              <__next_root_layout_boundary__>
-                <SegmentViewNode type="layout" pagePath="src/layout...">
-                  <SegmentTrieNode>
-                  <link>
-                  <script>
-                  <script>
-                  <RootLayout>
-                    <html lang="en" className="h-full">
-                      <body className="min-h-full...">
-                        <Script>
-                        <Header>
-                          <header className="sticky top...">
-                            <div>
-                            <div className="max-w-7xl ...">
-                              <div>
-                              <div className="relative f..." ref={{current:null}}>
-                                <div className="relative">
-                                  <Search>
-                                  <input
-                                    type="text"
-                                    placeholder="Search breaking news, AI updates, market trends..."
-                                    value=""
-                                    onChange={function onChange}
-                                    onFocus={function onFocus}
-                                    className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-900 border border-sla..."
--                                   style={{caret-color:"transparent"}}
-                                  >
-                              ...
-                            ...
-                        <BreakingTicker>
-                        <div>
-                        ...
-                          <div className="grid grid-...">
-                            <div className="lg:col-spa...">
-                              <LinkComponent href="/news/open..." className="block rela...">
-                                <a
-                                  className="block relative overflow-hidden rounded-2xl bg-slate-900 border border-sla..."
-                                  ref={function}
-                                  onClick={function onClick}
-                                  onMouseEnter={function onMouseEnter}
-                                  onTouchStart={function onTouchStart}
-+                                 href="/news/openai-unveils-gpt-5-quantum-leap-reasoning"
--                                 href="/news/trending-search-analysis-my-parents-wont-lend-me-10k-but-helped-my-broth..."
+    <HTTPAccessFallbackErrorBoundary pathname="/" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+      <RedirectBoundary>
+        <RedirectErrorBoundary router={{...}}>
+          <InnerLayoutRouter url="/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} segmentPath={[...]} ...>
+            <SegmentViewNode type="page" pagePath="src/page.tsx">
+              <SegmentTrieNode>
+              <ClientPageRoot Component={function HomePage} serverProvidedParams={{...}}>
+                <HomePage params={Promise} searchParams={Promise}>
+                  <div className="space-y-8">
+                    <section className="space-y-4">
+                      <div>
+                      <div className="grid grid-...">
+                        <div className="lg:col-spa...">
+                          <LinkComponent href="/news/open..." className="block rela...">
+                            <a
+                              className="block relative overflow-hidden rounded-2xl bg-slate-900 border border-slate-8..."
+                              ref={function}
+                              onClick={function onClick}
+                              onMouseEnter={function onMouseEnter}
+                              onTouchStart={function onTouchStart}
++                             href="/news/openai-unveils-gpt-5-quantum-leap-reasoning"
+-                             href="/news/clima-tijuana-pronostico-hoy-1-septiembre-2026"
+                            >
+                              <div className="relative h...">
+                                <img
++                                 src={"https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=..."}
+-                                 src={"https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=..."}
++                                 alt="OpenAI Unveils GPT-5: A Quantum Leap in Autonomous Reasoning and Multimodal Int..."
+-                                 alt="Clima Tijuana: Pronóstico detallado para hoy martes 1 de septiembre de 2026"
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform dur..."
                                 >
-                                  <div className="relative h...">
-                                    <img
-+                                     src={"https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&..."}
--                                     src={"https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&..."}
-+                                     alt="OpenAI Unveils GPT-5: A Quantum Leap in Autonomous Reasoning and Multimodal..."
--                                     alt={"Trending Search Analysis: 'My Parents Won'T Lend Me £10K But Helped My Br..."}
-                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform..."
-                                    >
-                                    <div>
-                                    <div className="absolute t...">
-                                      <span
-                                        className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-..."
-                                      >
-+                                       AI
--                                       Business
-                                      ...
-                                    ...
-                            ...
+                                <div>
+                                <div className="absolute t...">
+                                  <span
+                                    className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-blue..."
+                                  >
++                                   AI
+-                                   World
+                                  ...
+                                ...
                         ...
-              ...
+                    ...
+            ...
+          ...
 
     at <unknown> (https://react.dev/link/hydration-mismatch)
     at span (<anonymous>)
@@ -109,5 +82,7 @@ https://react.dev/link/hydration-mismatch
   65 |                       {heroArticle.category}
   66 |                     </span>
   67 |                     {heroArticle.isBreaking && (
- GET /api/articles 200 in 1535ms (next.js: 1473ms, application-code: 62ms)
- GET /api/articles 200 in 20ms (next.js: 7ms, application-code: 13ms)
+ GET /api/articles 200 in 1298ms (next.js: 1228ms, application-code: 70ms)
+ GET /api/articles 200 in 21ms (next.js: 4ms, application-code: 17ms)
+[Subscribe API] RESEND_API_KEY is not configured in environment.
+ POST /api/subscribe 503 in 255ms (next.js: 241ms, application-code: 14ms)
