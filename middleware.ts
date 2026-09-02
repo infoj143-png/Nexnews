@@ -5,7 +5,13 @@ import { jwtVerify } from 'jose';
 const COOKIE_NAME = 'admin_session';
 
 function getJwtSecretKey(): Uint8Array {
-  const secret = process.env.ADMIN_SESSION_SECRET || 'dev_nexnews_admin_secret_key_change_in_production_32bytes';
+  const secret = process.env.ADMIN_SESSION_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('ADMIN_SESSION_SECRET environment variable is not configured.');
+    }
+    return new TextEncoder().encode('dev_nexnews_admin_secret_key_change_in_production_32bytes');
+  }
   return new TextEncoder().encode(secret);
 }
 
