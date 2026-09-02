@@ -151,8 +151,147 @@ CATEGORY_IMAGES = {
     "Tech": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80",
     "World": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80",
     "Business": "https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?auto=format&fit=crop&w=1200&q=80",
-    "Sports": "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80"
+    "Sports": "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1200&q=80"
 }
+
+STOP_WORDS = {
+    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
+    "by", "from", "up", "about", "into", "over", "after", "is", "are", "was", "were",
+    "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would",
+    "should", "could", "can", "may", "might", "must", "shall", "this", "that", "these",
+    "those", "trending", "search", "analysis", "news", "vs", "versus", "live", "today",
+    "2024", "2025", "2026", "2027", "day", "match", "scorecard", "update", "updates",
+    "show", "hn", "opentie", "openxwa"
+}
+
+def extract_search_keywords(headline: str, trending_keyword: str = "", category: str = "") -> list:
+    """Extracts 2-3 essential keywords from headline/trending topic for image search queries."""
+    combined_text = f"{trending_keyword} {headline}"
+    cleaned = re.sub(r'[^\w\s]', ' ', combined_text)
+    words = [w.strip() for w in cleaned.split() if w.strip()]
+
+    meaningful = [w for w in words if w.lower() not in STOP_WORDS and len(w) > 2 and not w.isdigit()]
+
+    unique_words = []
+    seen = set()
+    for w in meaningful:
+        if w.lower() not in seen:
+            seen.add(w.lower())
+            unique_words.append(w)
+
+    queries = []
+    if len(unique_words) >= 3:
+        queries.append(" ".join(unique_words[:3]))
+    if len(unique_words) >= 2:
+        queries.append(" ".join(unique_words[:2]))
+    if unique_words:
+        queries.append(unique_words[0])
+
+    if trending_keyword and trending_keyword.strip():
+        tk_clean = re.sub(r'[^\w\s]', ' ', trending_keyword).strip()
+        if tk_clean and tk_clean not in queries:
+            queries.insert(0, tk_clean)
+
+    return list(dict.fromkeys(queries))
+
+def fetch_unsplash_api_image(query: str, access_key: str) -> str:
+    """Queries Unsplash API using access_key."""
+    if not access_key or not query:
+        return None
+    try:
+        encoded = urllib.parse.quote(query)
+        url = f"https://api.unsplash.com/search/photos?query={encoded}&per_page=3&orientation=landscape"
+        req = urllib.request.Request(url, headers={"Authorization": f"Client-ID {access_key}", "User-Agent": "Nexnews/1.0"})
+        with urllib.request.urlopen(req, timeout=8) as res:
+            if res.status == 200:
+                data = json.loads(res.read().decode("utf-8"))
+                results = data.get("results", [])
+                if results:
+                    return results[0].get("urls", {}).get("regular")
+    except Exception as e:
+        print(f"[-] [IMAGE SEARCH] Unsplash API query error for '{query}': {e}")
+    return None
+
+def fetch_pexels_api_image(query: str, api_key: str) -> str:
+    """Queries Pexels API using api_key."""
+    if not api_key or not query:
+        return None
+    try:
+        encoded = urllib.parse.quote(query)
+        url = f"https://api.pexels.com/v1/search?query={encoded}&per_page=3&orientation=landscape"
+        req = urllib.request.Request(url, headers={"Authorization": api_key, "User-Agent": "Nexnews/1.0"})
+        with urllib.request.urlopen(req, timeout=8) as res:
+            if res.status == 200:
+                data = json.loads(res.read().decode("utf-8"))
+                photos = data.get("photos", [])
+                if photos:
+                    src = photos[0].get("src", {})
+                    return src.get("landscape") or src.get("large2x") or src.get("large")
+    except Exception as e:
+        print(f"[-] [IMAGE SEARCH] Pexels API query error for '{query}': {e}")
+    return None
+
+def fetch_wikimedia_image(query: str) -> str:
+    """Queries Wikimedia Commons API for a topically relevant raster image."""
+    if not query:
+        return None
+    try:
+        encoded = urllib.parse.quote(query)
+        url = f"https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch={encoded}&gsrnamespace=6&gsrlimit=8&prop=imageinfo&iiprop=url|mime&format=json"
+        req = urllib.request.Request(url, headers={"User-Agent": "NexnewsBot/1.0 (https://nexnews.vercel.app)"})
+        with urllib.request.urlopen(req, timeout=8) as res:
+            if res.status == 200:
+                data = json.loads(res.read().decode("utf-8"))
+                pages = data.get("query", {}).get("pages", {})
+                for pid, page in pages.items():
+                    ii = page.get("imageinfo", [])
+                    if ii:
+                        img_url = ii[0].get("url", "")
+                        mime = ii[0].get("mime", "")
+                        if mime in ["image/jpeg", "image/png", "image/webp"] and not any(x in img_url.lower() for x in [".svg", ".tif", "coin.jpg", "logo", "icon", "map"]):
+                            return img_url
+    except Exception as e:
+        print(f"[-] [IMAGE SEARCH] Wikimedia search error for '{query}': {e}")
+    return None
+
+def fetch_article_image(headline: str, trending_keyword: str = "", category: str = "Tech") -> tuple:
+    """
+    Dynamically fetches an article image based on headline/keywords.
+    Checks UNSPLASH_ACCESS_KEY, PEXELS_API_KEY, Wikimedia Commons, and falls back to CATEGORY_IMAGES.
+    Returns (image_url, image_caption).
+    """
+    unsplash_key = os.environ.get("UNSPLASH_ACCESS_KEY")
+    pexels_key = os.environ.get("PEXELS_API_KEY")
+
+    queries = extract_search_keywords(headline, trending_keyword, category)
+
+    for query in queries:
+        # 1. Try Unsplash API if key exists
+        if unsplash_key:
+            img_url = fetch_unsplash_api_image(query, unsplash_key)
+            if img_url:
+                print(f"[+] [IMAGE SEARCH] Found keyword image via Unsplash API for '{query}': {img_url}")
+                return img_url, f"Visual representation for '{headline}' ({query})"
+
+        # 2. Try Pexels API if key exists
+        if pexels_key:
+            img_url = fetch_pexels_api_image(query, pexels_key)
+            if img_url:
+                print(f"[+] [IMAGE SEARCH] Found keyword image via Pexels API for '{query}': {img_url}")
+                return img_url, f"Visual representation for '{headline}' ({query})"
+
+        # 3. Try Wikimedia Commons search
+        img_url = fetch_wikimedia_image(query)
+        if img_url:
+            print(f"[+] [IMAGE SEARCH] Found keyword image via Wikimedia for '{query}': {img_url}")
+            return img_url, f"Media coverage visual for '{headline}'"
+
+    # 4. Fallback path to category default
+    default_url = CATEGORY_IMAGES.get(category, CATEGORY_IMAGES["Tech"])
+    first_q = queries[0] if queries else (trending_keyword or headline)
+    print(f"[-] [IMAGE SEARCH] Keyword search failed/returned no results for '{first_q}'. Falling back to '{category}' category default: {default_url}")
+
+    return default_url, f"Category visual for '{headline}' ({category})"
 
 # Supported Google Trends GEO codes for broad worldwide coverage
 GOOGLE_TRENDS_GEOS = ["US", "GB", "IN", "PK", "CA", "AU", "AE", "SA", "DE", "FR", "JP", "BR", "MX"]
@@ -722,6 +861,12 @@ def main():
     published_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     article_id = str(int(time.time() * 1000))
 
+    image_url, image_caption = fetch_article_image(
+        headline=title,
+        trending_keyword=selected_topic.get("trending_keyword", ""),
+        category=cat
+    )
+
     full_article = {
         "id": article_id,
         "title": title,
@@ -736,8 +881,8 @@ def main():
         },
         "publishedAt": published_at,
         "readTime": "4 min read",
-        "imageUrl": CATEGORY_IMAGES.get(cat, CATEGORY_IMAGES["Tech"]),
-        "imageCaption": f"Visual representation for '{title}'",
+        "imageUrl": image_url,
+        "imageCaption": image_caption,
         "isFeatured": True,
         "isTrending": True,
         "isBreaking": True,

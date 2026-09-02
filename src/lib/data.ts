@@ -188,7 +188,7 @@ let initialArticles: Article[] = [
     },
     publishedAt: '2025-02-25T22:10:00Z',
     readTime: '3 min read',
-    imageUrl: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80',
+    imageUrl: 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1200&q=80',
     imageCaption: 'Stadium floodlights shining on the pitch during high-stakes football tournament.',
     isFeatured: false,
     isTrending: false,
