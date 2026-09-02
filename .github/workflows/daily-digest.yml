@@ -1,0 +1,35 @@
+name: Daily AI Digest Dispatcher
+
+on:
+  schedule:
+    # 8:00 AM Pakistan Standard Time (UTC+5) is 3:00 AM UTC
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  send-daily-digest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run Daily Digest Script
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          SITE_URL: "https://nexnews-nu.vercel.app"
+        run: |
+          python scripts/send_daily_digest.py
