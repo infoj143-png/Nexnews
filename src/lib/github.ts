@@ -1,6 +1,10 @@
-import { Article } from './data';
+import { Article, isValidSlug } from './data';
 
 export async function saveArticleToGitHub(article: Article): Promise<boolean> {
+  if (!isValidSlug(article.slug)) {
+    console.error(`[GitHub API] Invalid slug for article save: '${article.slug}'`);
+    return false;
+  }
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
   if (!token) {
     console.warn('[GitHub API] GITHUB_TOKEN is not configured. Skipping GitHub repository commit.');
@@ -83,6 +87,11 @@ export async function saveArticleToGitHub(article: Article): Promise<boolean> {
 }
 
 export async function deleteArticleFromGitHub(slug: string): Promise<boolean> {
+  if (!isValidSlug(slug)) {
+    console.error(`[GitHub API] Invalid slug for article delete: '${slug}'`);
+    return false;
+  }
+
   const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
   if (!token) {
     console.warn('[GitHub API] GITHUB_TOKEN is not configured. Skipping GitHub repository delete.');

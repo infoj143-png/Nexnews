@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getArticles, addArticle, deleteArticle, searchArticles, getAnalytics } from '@/lib/data';
+import { getArticles, addArticle, deleteArticle, searchArticles, getAnalytics, isValidSlug, slugify } from '@/lib/data';
 import { requireAdminAuth } from '@/lib/auth';
 
 export async function GET(request: Request) {
@@ -43,7 +43,24 @@ export async function POST(request: Request) {
       );
     }
 
-    const slug = body.slug || body.title.toLowerCase().replace(/[^\w ]+/g, '').replace(/ +/g, '-');
+    let slug: string;
+    if (body.slug) {
+      if (!isValidSlug(body.slug)) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid article slug format.' },
+          { status: 400 }
+        );
+      }
+      slug = body.slug;
+    } else {
+      slug = slugify(body.title);
+      if (!isValidSlug(slug)) {
+        return NextResponse.json(
+          { success: false, error: 'Failed to generate valid slug from title.' },
+          { status: 400 }
+        );
+      }
+    }
 
     const newArticle = await addArticle({
       title: body.title,
