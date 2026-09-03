@@ -45,7 +45,7 @@ export async function POST(request: Request) {
 
     const slug = body.slug || body.title.toLowerCase().replace(/[^\w ]+/g, '').replace(/ +/g, '-');
 
-    const newArticle = addArticle({
+    const newArticle = await addArticle({
       title: body.title,
       slug,
       summary: body.summary || body.title,
@@ -92,7 +92,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: 'Article ID required' }, { status: 400 });
     }
 
-    const success = deleteArticle(id);
+    const success = await deleteArticle(id);
     return NextResponse.json({ success });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error';
