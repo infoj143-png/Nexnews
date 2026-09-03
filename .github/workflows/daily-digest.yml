@@ -1,9 +1,10 @@
 name: Daily AI Digest Dispatcher
 
 on:
-  schedule:
-    # 8:00 AM Pakistan Standard Time (UTC+5) is 3:00 AM UTC
-    - cron: '0 3 * * *'
+  # Scheduled trigger paused until custom domain is verified in Resend
+  # schedule:
+  #   # 8:00 AM Pakistan Standard Time (UTC+5) is 3:00 AM UTC
+  #   - cron: '0 3 * * *'
   workflow_dispatch:
 
 permissions:
