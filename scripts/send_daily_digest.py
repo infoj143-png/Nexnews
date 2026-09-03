@@ -137,8 +137,9 @@ def generate_digest_html(articles: list, site_url: str) -> str:
 def get_or_create_audience(api_key: str) -> str:
     """Fetches or creates the 'Nexnews Subscribers' audience ID via Resend API."""
     headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {api_key.strip()}",
+        "Content-Type": "application/json",
+        "User-Agent": "Nexnews-DailyDigest/1.0"
     }
 
     # 1. Fetch existing audiences
@@ -171,8 +172,9 @@ def get_or_create_audience(api_key: str) -> str:
 def send_digest_broadcast(api_key: str, audience_id: str, html_content: str, article_count: int, from_email: str = DEFAULT_FROM_EMAIL) -> bool:
     """Creates and triggers a Resend Broadcast campaign to the specified Audience."""
     headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {api_key.strip()}",
+        "Content-Type": "application/json",
+        "User-Agent": "Nexnews-DailyDigest/1.0"
     }
     date_str = datetime.now(timezone.utc).strftime("%B %d, %Y")
     subject = f"Nexnews Daily AI Digest — {date_str} ({article_count} Top Stories)"
@@ -221,7 +223,7 @@ def main():
     print("  Nexnews Daily AI Digest Dispatcher              ")
     print("==================================================")
 
-    resend_key = os.environ.get("RESEND_API_KEY")
+    resend_key = os.environ.get("RESEND_API_KEY", "").strip()
     if not resend_key:
         print("[-] RESEND_API_KEY environment variable is missing. Aborting digest run.")
         sys.exit(1)
