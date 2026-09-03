@@ -341,7 +341,16 @@ import { saveArticleToGitHub, deleteArticleFromGitHub } from './github';
  * Adds an article to in-memory state, attempts local disk write, and commits the JSON
  * file to GitHub via REST API for serverless persistence on Vercel.
  */
+const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export function isValidSlug(slug: string): boolean {
+  return typeof slug === 'string' && slug.length > 0 && slug.length <= 200 && SLUG_PATTERN.test(slug);
+}
+
 export async function addArticle(article: Omit<Article, 'id' | 'views'>): Promise<Article> {
+  if (!isValidSlug(article.slug)) {
+    throw new Error(`Invalid slug format: '${article.slug}'`);
+  }
   const sanitizedContent = sanitizeHtml(article.content);
   const newArticle: Article = {
     ...article,
@@ -438,10 +447,16 @@ export async function deleteArticle(id: string): Promise<boolean> {
 }
 
 export function slugify(text: string): string {
+  if (!text) return '';
   return text
     .toLowerCase()
-    .replace(/[^\w ]+/g, '')
-    .replace(/ +/g, '-');
+    .replace(/[^a-z0-9\s-]/g, '')
+    .trim()
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .substring(0, 200)
+    .replace(/^-+|-+$/g, '');
 }
 
 export function getAnalytics(): AnalyticsData {
