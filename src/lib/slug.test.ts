@@ -7,7 +7,7 @@ import { saveArticleToGitHub, deleteArticleFromGitHub } from './github';
 import { signAdminToken } from './auth';
 import { POST } from '../app/api/articles/route';
 
-after(() => {
+after(async () => {
   // Clean up any test article file written to data/articles/
   const testFilePath = path.join(process.cwd(), 'data', 'articles', 'some-valid-article-title.json');
   if (fs.existsSync(testFilePath)) {
@@ -16,6 +16,11 @@ after(() => {
     } catch {
       // Ignore error
     }
+  }
+  try {
+    await deleteArticleFromGitHub('some-valid-article-title');
+  } catch {
+    // Ignore error
   }
 });
 
@@ -173,11 +178,21 @@ test('POST /api/articles handler rejects malicious slugs with 400 Bad Request', 
     slug: 'some-valid-article-title'
   };
 
-  const reqValid = createMockPostRequest(validPayload);
-  const resValid = await POST(reqValid);
-  assert.strictEqual(resValid.status, 201, 'POST /api/articles with valid slug should return 201 status');
+  const origGhToken = process.env.GITHUB_TOKEN;
+  const origGhToken2 = process.env.GH_TOKEN;
+  delete process.env.GITHUB_TOKEN;
+  delete process.env.GH_TOKEN;
 
-  const resValidJson = await resValid.json();
-  assert.strictEqual(resValidJson.success, true);
-  assert.strictEqual(resValidJson.article.slug, 'some-valid-article-title');
+  try {
+    const reqValid = createMockPostRequest(validPayload);
+    const resValid = await POST(reqValid);
+    assert.strictEqual(resValid.status, 201, 'POST /api/articles with valid slug should return 201 status');
+
+    const resValidJson = await resValid.json();
+    assert.strictEqual(resValidJson.success, true);
+    assert.strictEqual(resValidJson.article.slug, 'some-valid-article-title');
+  } finally {
+    if (origGhToken) process.env.GITHUB_TOKEN = origGhToken;
+    if (origGhToken2) process.env.GH_TOKEN = origGhToken2;
+  }
 });
