@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     const { email } = body;
 
     // 1. Validate email input
-    if (!email || typeof email !== 'string' || !EMAIL_REGEX.test(email.trim())) {
+    if (!email || typeof email !== 'string' || email.trim().length > 254 || !EMAIL_REGEX.test(email.trim())) {
       return NextResponse.json(
         { success: false, error: 'Please enter a valid email address.' },
         { status: 400 }
