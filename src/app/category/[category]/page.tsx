@@ -38,9 +38,17 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
       canonical: categoryUrl,
     },
     openGraph: {
-      title: `${capitalized} News - Nexnews`,
+      title: `${capitalized} News & Updates - Nexnews`,
       description: `Explore top stories and real-time coverage in ${capitalized}.`,
-    }
+      url: categoryUrl,
+      siteName: 'Nexnews',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${capitalized} News & Updates - Nexnews`,
+      description: `Explore top stories and real-time coverage in ${capitalized}.`,
+    },
   };
 }
 
@@ -56,9 +64,34 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   }
 
   const articles = getArticlesByCategory(matchedCategory);
+  const categoryUrl = `${getSiteUrl()}/category/${matchedCategory.toLowerCase()}`;
+
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    'itemListElement': [
+      {
+        '@type': 'ListItem',
+        'position': 1,
+        'name': 'Home',
+        'item': getSiteUrl(),
+      },
+      {
+        '@type': 'ListItem',
+        'position': 2,
+        'name': matchedCategory,
+        'item': categoryUrl,
+      },
+    ],
+  };
 
   return (
     <div className="space-y-8">
+      {/* JSON-LD Structured Data for Breadcrumbs */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
       {/* Category Header Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl p-6 sm:p-10 border border-slate-800 relative overflow-hidden shadow-md">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">

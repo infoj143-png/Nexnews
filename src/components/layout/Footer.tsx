@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { CATEGORIES } from '@/lib/data';
-import { Sparkles, Rss, Shield, Mail, Globe } from 'lucide-react';
+import { Rss, Globe } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (

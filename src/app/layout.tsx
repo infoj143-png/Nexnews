@@ -19,14 +19,39 @@ export const metadata: Metadata = {
   },
   description: "Stay ahead with Nexnews, an AI-powered automated news website delivering real-time coverage across Tech, World, Business, AI, and Sports.",
   keywords: ["AI news", "automated news", "breaking news", "technology news", "financial markets"],
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
   openGraph: {
     type: "website",
     locale: "en_US",
     url: getSiteUrl(),
     siteName: "Nexnews",
-    title: "Nexnews - AI-Powered Automated News Portal",
-    description: "Real-time AI automated news covering breaking stories globally."
-  }
+    title: "Nexnews | AI-Powered Automated News Portal",
+    description: "Stay ahead with Nexnews, an AI-powered automated news website delivering real-time coverage across Tech, World, Business, AI, and Sports.",
+    images: [
+      {
+        url: `${getSiteUrl()}/logo.png`,
+        width: 512,
+        height: 512,
+        alt: "Nexnews Logo",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Nexnews | AI-Powered Automated News Portal",
+    description: "Stay ahead with Nexnews, an AI-powered automated news website delivering real-time coverage across Tech, World, Business, AI, and Sports.",
+    images: [`${getSiteUrl()}/logo.png`],
+  },
 };
 
 export default function RootLayout({

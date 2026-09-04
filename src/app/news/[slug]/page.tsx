@@ -47,6 +47,7 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
     alternates: {
       canonical: articleUrl,
     },
+    keywords: article.tags,
     authors: [{ name: article.author.name }],
     openGraph: {
       title: article.title,
@@ -55,6 +56,8 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
       siteName: 'Nexnews',
       type: 'article',
       publishedTime: article.publishedAt,
+      modifiedTime: article.publishedAt,
+      section: article.category,
       authors: [article.author.name],
       tags: article.tags,
       images: [
@@ -117,6 +120,7 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
   const newsArticleSchema = {
     '@context': 'https://schema.org',
     '@type': 'NewsArticle',
+    'inLanguage': 'en-US',
     'mainEntityOfPage': {
       '@type': 'WebPage',
       '@id': articleUrl,
@@ -143,6 +147,31 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
     'keywords': article.tags.join(', '),
   };
 
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    'itemListElement': [
+      {
+        '@type': 'ListItem',
+        'position': 1,
+        'name': 'Home',
+        'item': getSiteUrl(),
+      },
+      {
+        '@type': 'ListItem',
+        'position': 2,
+        'name': article.category,
+        'item': `${getSiteUrl()}/category/${article.category.toLowerCase()}`,
+      },
+      {
+        '@type': 'ListItem',
+        'position': 3,
+        'name': article.title,
+        'item': articleUrl,
+      },
+    ],
+  };
+
   const faqSchema = faqs.length > 0 ? {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
@@ -162,6 +191,10 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(newsArticleSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
       {faqSchema && (
         <script
