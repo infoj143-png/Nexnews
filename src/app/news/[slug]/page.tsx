@@ -1,6 +1,7 @@
 import React from 'react';
 import { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import { notFound } from 'next/navigation';
 import { getArticleBySlug, getArticles, getArticlesByCategory } from '@/lib/data';
 import { sanitizeHtml } from '@/lib/sanitize';
@@ -204,9 +205,11 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
             {/* Author Metadata Header Card */}
             <div className="flex items-center justify-between p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
               <div className="flex items-center gap-3">
-                <img
+                <Image
                   src={article.author.avatar}
                   alt={article.author.name}
+                  width={44}
+                  height={44}
                   className="w-11 h-11 rounded-full object-cover border-2 border-blue-500"
                 />
                 <div>
@@ -235,11 +238,16 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
 
           {/* Featured Hero Image */}
           <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-sm">
-            <img
-              src={article.imageUrl}
-              alt={article.title}
-              className="w-full h-auto max-h-[460px] object-cover"
-            />
+            <div className="relative w-full aspect-video max-h-[460px]">
+              <Image
+                src={article.imageUrl}
+                alt={article.title}
+                fill
+                priority
+                sizes="(max-width: 1024px) 100vw, 800px"
+                className="object-cover"
+              />
+            </div>
             {article.imageCaption && (
               <p className="p-3 text-xs text-slate-400 text-center bg-slate-900/90 italic">
                 {article.imageCaption}
@@ -291,10 +299,12 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                     className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 hover:border-blue-500/40 transition-all flex flex-col justify-between"
                   >
                     <div className="h-28 rounded-lg overflow-hidden mb-2 relative">
-                      <img
+                      <Image
                         src={rel.imageUrl}
                         alt={rel.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        fill
+                        sizes="(max-width: 640px) 100vw, 250px"
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     </div>
                     <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-500 line-clamp-2 leading-snug">
