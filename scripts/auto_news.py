@@ -18,6 +18,7 @@ from datetime import datetime, timezone, timedelta
 import urllib.request
 import urllib.parse
 import xml.etree.ElementTree as ET
+import html
 
 from google.oauth2 import service_account
 from google.auth.transport.requests import AuthorizedSession
@@ -478,7 +479,10 @@ NON_TREND_FEEDS = [
 ]
 
 def slugify(text: str) -> str:
-    """Converts a title into a URL-friendly slug."""
+    """Converts a title into a URL-friendly slug after decoding HTML entities."""
+    if not text:
+        return ""
+    text = html.unescape(text)
     text = text.lower()
     text = re.sub(r'[^\w\s-]', '', text)
     text = re.sub(r'[\s_-]+', '-', text)

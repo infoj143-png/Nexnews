@@ -69,7 +69,7 @@ export async function POST(request: Request) {
       content: body.content,
       category: body.category,
       author: body.author || {
-        name: 'Nexnews AI System',
+        name: 'Nexnews Desk',
         avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
         role: 'Automated AI Desk'
       },
