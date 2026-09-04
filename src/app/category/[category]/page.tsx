@@ -1,8 +1,9 @@
 import React from 'react';
 import { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import { CATEGORIES, Category, getArticlesByCategory } from '@/lib/data';
+import { CATEGORIES, getArticlesByCategory } from '@/lib/data';
 import { getSiteUrl } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
@@ -92,10 +93,12 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
               <React.Fragment key={article.id}>
                 <article className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 hover:border-blue-500/40 transition-all shadow-xs flex flex-col sm:flex-row gap-6">
                   <div className="sm:w-52 h-44 sm:h-36 shrink-0 rounded-xl overflow-hidden relative bg-slate-100 dark:bg-slate-800">
-                    <img
+                    <Image
                       src={article.imageUrl}
                       alt={article.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      fill
+                      sizes="(max-width: 640px) 100vw, 208px"
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>
 

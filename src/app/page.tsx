@@ -3,11 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { CATEGORIES, Category, getArticles, Article } from '@/lib/data';
+import { CATEGORIES, getArticles, Article } from '@/lib/data';
 import { AdBanner } from '@/components/ads/AdBanner';
 import { TrendingSidebar } from '@/components/widgets/TrendingSidebar';
 import { NewsletterWidget } from '@/components/widgets/NewsletterWidget';
-import { Clock, Eye, Sparkles, ChevronRight, Zap, Filter } from 'lucide-react';
+import { Clock, Eye, ChevronRight, Zap } from 'lucide-react';
 
 export default function HomePage() {
   const [articles, setArticles] = useState<Article[]>(() => getArticles());
@@ -52,10 +52,13 @@ export default function HomePage() {
             <div className="lg:col-span-2 group">
               <Link href={`/news/${heroArticle.slug}`} className="block relative overflow-hidden rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
                 <div className="relative h-72 sm:h-96 w-full overflow-hidden">
-                  <img
+                  <Image
                     src={heroArticle.imageUrl}
                     alt={heroArticle.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-85"
+                    fill
+                    priority
+                    sizes="(max-width: 1024px) 100vw, 66vw"
+                    className="object-cover group-hover:scale-105 transition-transform duration-500 opacity-85"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
 
@@ -175,12 +178,14 @@ export default function HomePage() {
               <React.Fragment key={article.id}>
                 <article className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 hover:border-blue-500/40 transition-all shadow-xs flex flex-col sm:flex-row gap-4 sm:gap-6">
                   <div className="sm:w-48 h-40 sm:h-32 shrink-0 rounded-xl overflow-hidden relative bg-slate-100 dark:bg-slate-800">
-                    <img
+                    <Image
                       src={article.imageUrl}
                       alt={article.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      fill
+                      sizes="(max-width: 640px) 100vw, 192px"
+                      className="object-cover group-hover:scale-105 transition-transform duration-300"
                     />
-                    <span className="absolute top-2 left-2 bg-slate-900/80 text-white text-[10px] font-bold px-2 py-0.5 rounded backdrop-blur-xs">
+                    <span className="absolute top-2 left-2 bg-slate-900/80 text-white text-[10px] font-bold px-2 py-0.5 rounded backdrop-blur-xs z-10">
                       {article.category}
                     </span>
                   </div>
