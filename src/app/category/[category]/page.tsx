@@ -3,6 +3,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { CATEGORIES, Category, getArticlesByCategory } from '@/lib/data';
+import { getSiteUrl } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -27,10 +28,14 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   const resolvedParams = await params;
   const categoryName = resolvedParams.category;
   const capitalized = categoryName.charAt(0).toUpperCase() + categoryName.slice(1);
+  const categoryUrl = `${getSiteUrl()}/category/${categoryName.toLowerCase()}`;
 
   return {
     title: `${capitalized} News & Updates`,
     description: `Latest breaking ${capitalized} news, in-depth analysis, and AI automated insights on Nexnews.`,
+    alternates: {
+      canonical: categoryUrl,
+    },
     openGraph: {
       title: `${capitalized} News - Nexnews`,
       description: `Explore top stories and real-time coverage in ${capitalized}.`,
