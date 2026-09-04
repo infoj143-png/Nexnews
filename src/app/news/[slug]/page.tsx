@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import { getArticleBySlug, getArticles, getArticlesByCategory } from '@/lib/data';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { getSiteUrl } from '@/lib/site';
+import { extractSourceAttribution } from '@/lib/trust';
 
 export const dynamicParams = true;
 export const revalidate = 300;
@@ -13,6 +14,7 @@ import { AdBanner } from '@/components/ads/AdBanner';
 import { TrendingSidebar } from '@/components/widgets/TrendingSidebar';
 import { NewsletterWidget } from '@/components/widgets/NewsletterWidget';
 import { ArticleActions } from '@/components/article/ArticleActions';
+import { ArticleTrustBadge } from '@/components/article/ArticleTrustBadge';
 import { Clock, Eye, ChevronLeft, Calendar, Tag } from 'lucide-react';
 
 interface ArticlePageProps {
@@ -116,8 +118,9 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
 
   const articleUrl = `${getSiteUrl()}/news/${article.slug}`;
   const faqs = extractFaqsFromContent(article.content);
+  const sourceInfo = extractSourceAttribution(article.content);
 
-  const newsArticleSchema = {
+  const newsArticleSchema: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'NewsArticle',
     'inLanguage': 'en-US',
@@ -146,6 +149,14 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
     'articleSection': article.category,
     'keywords': article.tags.join(', '),
   };
+
+  if (sourceInfo.sourceUrl) {
+    newsArticleSchema['isBasedOn'] = {
+      '@type': 'NewsArticle',
+      'name': sourceInfo.sourceName || 'Original Source',
+      'url': sourceInfo.sourceUrl,
+    };
+  }
 
   const breadcrumbSchema = {
     '@context': 'https://schema.org',
@@ -267,6 +278,9 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                 </span>
               </div>
             </div>
+
+            {/* AI News Verification & Transparency Badge */}
+            <ArticleTrustBadge article={article} />
           </div>
 
           {/* Featured Hero Image */}
