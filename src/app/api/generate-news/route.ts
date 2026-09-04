@@ -540,7 +540,10 @@ export async function POST(request: Request) {
       message: 'Article synthesized and auto-published successfully.'
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
+    const isProduction = process.env.NODE_ENV === 'production';
+    const message = isProduction
+      ? 'Failed to generate news article due to a server error.'
+      : (err instanceof Error ? err.message : 'Unknown error');
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

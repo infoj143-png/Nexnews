@@ -34,11 +34,20 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
 
-    if (!body.title || !body.content || !body.category) {
+    if (!body || typeof body !== 'object') {
       return NextResponse.json(
-        { success: false, error: 'Title, content, and category are required.' },
+        { success: false, error: 'Invalid request body.' },
+        { status: 400 }
+      );
+    }
+
+    if (!body.title || typeof body.title !== 'string' ||
+        !body.content || typeof body.content !== 'string' ||
+        !body.category || typeof body.category !== 'string') {
+      return NextResponse.json(
+        { success: false, error: 'Title, content, and category are required and must be strings.' },
         { status: 400 }
       );
     }
@@ -90,7 +99,10 @@ export async function POST(request: Request) {
       article: newArticle
     }, { status: 201 });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
+    const isProduction = process.env.NODE_ENV === 'production';
+    const message = isProduction
+      ? 'Failed to process article request.'
+      : (err instanceof Error ? err.message : 'Unknown error');
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
@@ -105,14 +117,17 @@ export async function DELETE(request: Request) {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
-    if (!id) {
+    if (!id || typeof id !== 'string') {
       return NextResponse.json({ success: false, error: 'Article ID required' }, { status: 400 });
     }
 
     const success = await deleteArticle(id);
     return NextResponse.json({ success });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
+    const isProduction = process.env.NODE_ENV === 'production';
+    const message = isProduction
+      ? 'Failed to delete article.'
+      : (err instanceof Error ? err.message : 'Unknown error');
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

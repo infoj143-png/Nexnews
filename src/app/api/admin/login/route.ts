@@ -27,7 +27,21 @@ function getClientIp(request: Request): string {
   return '127.0.0.1';
 }
 
+function cleanupExpiredAttempts() {
+  const now = Date.now();
+  for (const [ip, attempt] of loginAttempts.entries()) {
+    if (attempt.lockoutUntil > 0) {
+      if (now > attempt.lockoutUntil) {
+        loginAttempts.delete(ip);
+      }
+    } else if (now - attempt.firstAttemptTime > WINDOW_MS) {
+      loginAttempts.delete(ip);
+    }
+  }
+}
+
 function checkRateLimit(ip: string): { allowed: boolean; retryAfterSeconds?: number } {
+  cleanupExpiredAttempts();
   const now = Date.now();
   const attempt = loginAttempts.get(ip);
 
@@ -100,19 +114,36 @@ export async function POST(request: Request) {
       );
     }
 
-    const { password } = await request.json();
+    const body = await request.json().catch(() => ({}));
+    const { password } = body;
 
-    if (!password) {
+    if (!password || typeof password !== 'string') {
       return NextResponse.json(
-        { success: false, error: 'Password is required' },
+        { success: false, error: 'Password is required and must be a string' },
         { status: 400 }
       );
     }
 
+    if (password.length > 1024) {
+      return NextResponse.json(
+        { success: false, error: 'Password exceeds maximum allowed length.' },
+        { status: 400 }
+      );
+    }
+
+    const isProduction = process.env.NODE_ENV === 'production';
     const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
     const adminPasswordPlain = process.env.ADMIN_PASSWORD;
 
-    if (!adminPasswordHash && !adminPasswordPlain) {
+    if (isProduction && !adminPasswordHash) {
+      console.error('[CRITICAL SECURITY ERROR] ADMIN_PASSWORD_HASH environment variable is required in production.');
+      return NextResponse.json(
+        { success: false, error: 'Server authentication configuration error. Admin access is disabled until properly configured.' },
+        { status: 500 }
+      );
+    }
+
+    if (!isProduction && !adminPasswordHash && !adminPasswordPlain) {
       console.error('[CRITICAL SECURITY ERROR] Neither ADMIN_PASSWORD nor ADMIN_PASSWORD_HASH environment variable is configured on server.');
       return NextResponse.json(
         { success: false, error: 'Server authentication configuration error. Admin access is disabled until configured.' },
@@ -124,7 +155,7 @@ export async function POST(request: Request) {
 
     if (adminPasswordHash) {
       isValid = await bcrypt.compare(password, adminPasswordHash);
-    } else if (adminPasswordPlain) {
+    } else if (!isProduction && adminPasswordPlain) {
       isValid = password === adminPasswordPlain;
     }
 
@@ -160,7 +191,10 @@ export async function POST(request: Request) {
       { status: 401 }
     );
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Authentication failed';
+    const isProduction = process.env.NODE_ENV === 'production';
+    const message = isProduction
+      ? 'Authentication failed due to a server error.'
+      : (err instanceof Error ? err.message : 'Authentication failed');
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

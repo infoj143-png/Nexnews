@@ -97,11 +97,14 @@ export function requireAdminAuth(request: Request): {
 
     return { authenticated: true, payload };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : 'Authentication verification failed';
+    const isProduction = process.env.NODE_ENV === 'production';
+    const message = isProduction
+      ? 'Server authentication configuration error.'
+      : `Server auth configuration error: ${err instanceof Error ? err.message : 'Authentication verification failed'}`;
     return {
       authenticated: false,
       errorResponse: NextResponse.json(
-        { success: false, error: `Server auth configuration error: ${message}` },
+        { success: false, error: message },
         { status: 500 }
       )
     };
