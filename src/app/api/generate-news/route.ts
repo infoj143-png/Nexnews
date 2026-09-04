@@ -518,7 +518,7 @@ export async function POST(request: Request) {
       content,
       category: finalCategory,
       author: {
-        name: 'Nexnews AI Synthesizer',
+        name: 'Nexnews Desk',
         avatar: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80',
         role: 'Autonomous AI Content Engine'
       },

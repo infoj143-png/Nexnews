@@ -1,9 +1,23 @@
 import assert from 'node:assert';
-import { test } from 'node:test';
+import { test, after } from 'node:test';
+import fs from 'node:fs';
+import path from 'node:path';
 import { isValidSlug, slugify, addArticle } from './data';
 import { saveArticleToGitHub, deleteArticleFromGitHub } from './github';
 import { signAdminToken } from './auth';
 import { POST } from '../app/api/articles/route';
+
+after(() => {
+  // Clean up any test article file written to data/articles/
+  const testFilePath = path.join(process.cwd(), 'data', 'articles', 'some-valid-article-title.json');
+  if (fs.existsSync(testFilePath)) {
+    try {
+      fs.unlinkSync(testFilePath);
+    } catch {
+      // Ignore error
+    }
+  }
+});
 
 test('isValidSlug accepts valid slugs', () => {
   const validSlugs = [
