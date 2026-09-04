@@ -208,6 +208,7 @@ export function updateArticle(id: string, updates: Partial<Article>): Article | 
 }
 
 export async function deleteArticle(id: string): Promise<boolean> {
+  // Reminder: if this slug/article may be indexed by search engines, add a redirect in next.config.ts
   let deleted = false;
   let targetSlug: string | null = null;
 
@@ -252,6 +253,7 @@ export async function deleteArticle(id: string): Promise<boolean> {
     }
 
     const slugToDelete = targetSlug || id;
+    console.log(`[deleteArticle] Deleting article '${slugToDelete}'. Note: if this slug may be indexed by search engines, add a redirect in next.config.ts.`);
     try {
       const ghDeleted = await deleteArticleFromGitHub(slugToDelete);
       if (ghDeleted) {
