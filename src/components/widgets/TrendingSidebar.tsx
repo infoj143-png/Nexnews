@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { TrendingUp, Flame, Sparkles, ArrowRight } from 'lucide-react';
+import { Flame } from 'lucide-react';
 import { getArticles } from '@/lib/data';
 
 export const TrendingSidebar: React.FC = () => {
