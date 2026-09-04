@@ -6,8 +6,13 @@ import { BreakingTicker } from "@/components/layout/BreakingTicker";
 import { Footer } from "@/components/layout/Footer";
 import { AdBanner } from "@/components/ads/AdBanner";
 import { getArticles } from "@/lib/data";
+import { getSiteUrl } from "@/lib/site";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getSiteUrl()),
+  alternates: {
+    canonical: getSiteUrl(),
+  },
   title: {
     default: "Nexnews | AI-Powered Automated News Portal",
     template: "%s | Nexnews"
@@ -17,7 +22,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://nexnews-nu.vercel.app",
+    url: getSiteUrl(),
     siteName: "Nexnews",
     title: "Nexnews - AI-Powered Automated News Portal",
     description: "Real-time AI automated news covering breaking stories globally."

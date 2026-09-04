@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Share2, Link as LinkIcon, Check, MessageSquare, Send } from 'lucide-react';
+import { getSiteUrl } from '@/lib/site';
 
 interface ArticleActionsProps {
   title: string;
@@ -25,7 +26,7 @@ export const ArticleActions: React.FC<ArticleActionsProps> = ({ title, summary, 
   ]);
   const [commentText, setCommentText] = useState('');
   const [authorName, setAuthorName] = useState('');
-  const [currentUrl, setCurrentUrl] = useState<string>(`https://nexnews-nu.vercel.app/news/${slug}`);
+  const [currentUrl, setCurrentUrl] = useState<string>(`${getSiteUrl()}/news/${slug}`);
 
   React.useEffect(() => {
     const frame = requestAnimationFrame(() => {

@@ -4,10 +4,10 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getArticleBySlug, getArticles, getArticlesByCategory } from '@/lib/data';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { getSiteUrl } from '@/lib/site';
 
-export const dynamic = 'force-dynamic';
 export const dynamicParams = true;
-export const revalidate = 0;
+export const revalidate = 300;
 import { AdBanner } from '@/components/ads/AdBanner';
 import { TrendingSidebar } from '@/components/widgets/TrendingSidebar';
 import { NewsletterWidget } from '@/components/widgets/NewsletterWidget';
@@ -38,11 +38,14 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
     };
   }
 
-  const articleUrl = `https://nexnews-nu.vercel.app/news/${article.slug}`;
+  const articleUrl = `${getSiteUrl()}/news/${article.slug}`;
 
   return {
     title: article.title,
     description: article.summary,
+    alternates: {
+      canonical: articleUrl,
+    },
     authors: [{ name: article.author.name }],
     openGraph: {
       title: article.title,
@@ -107,7 +110,7 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
     .filter(a => a.id !== article.id)
     .slice(0, 3);
 
-  const articleUrl = `https://nexnews-nu.vercel.app/news/${article.slug}`;
+  const articleUrl = `${getSiteUrl()}/news/${article.slug}`;
   const faqs = extractFaqsFromContent(article.content);
 
   const newsArticleSchema = {
@@ -129,10 +132,10 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
     'publisher': {
       '@type': 'Organization',
       'name': 'Nexnews',
-      'url': 'https://nexnews-nu.vercel.app',
+      'url': getSiteUrl(),
       'logo': {
         '@type': 'ImageObject',
-        'url': 'https://nexnews-nu.vercel.app/logo.png',
+        'url': `${getSiteUrl()}/logo.png`,
       },
     },
     'articleSection': article.category,
