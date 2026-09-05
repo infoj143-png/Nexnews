@@ -13,6 +13,7 @@ import { AdBanner } from '@/components/ads/AdBanner';
 import { TrendingSidebar } from '@/components/widgets/TrendingSidebar';
 import { NewsletterWidget } from '@/components/widgets/NewsletterWidget';
 import { ArticleActions } from '@/components/article/ArticleActions';
+import { ArticleTrustBadge } from '@/components/article/ArticleTrustBadge';
 import { Clock, Eye, ChevronLeft, Calendar, Tag } from 'lucide-react';
 
 interface ArticlePageProps {
@@ -267,6 +268,9 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                 </span>
               </div>
             </div>
+
+            {/* AI News Verification & Transparency Badge */}
+            <ArticleTrustBadge article={article} />
           </div>
 
           {/* Featured Hero Image */}
