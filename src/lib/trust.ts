@@ -13,7 +13,7 @@ export interface TrustSignals {
 }
 
 /**
-  Checks if a URL string is valid and uses a safe protocol (http or https only).
+ * Checks if a URL string is valid and uses a safe protocol (http or https only).
  */
 export function isValidSourceUrl(urlStr: string): boolean {
   if (!urlStr || typeof urlStr !== 'string') return false;
@@ -26,7 +26,7 @@ export function isValidSourceUrl(urlStr: string): boolean {
 }
 
 /**
- * Safely extracts source attribution (name and verified URL) from article content.
+ * Safely extracts source attribution (name and URL) from article content.
  * Never invents or fabricates missing information.
  */
 export function extractSourceAttribution(content: string): SourceAttribution {
@@ -90,9 +90,9 @@ export function getArticleTrustSignals(article: Article): TrustSignals {
   const qualitativeBadges: string[] = [];
 
   if (source.sourceUrl) {
-    qualitativeBadges.push('Verified External Source');
+    qualitativeBadges.push('External Source Link');
   } else if (source.sourceName) {
-    qualitativeBadges.push('Public Dispatches Cited');
+    qualitativeBadges.push('Source Citation Available');
   }
 
   if (isAiGenerated) {
@@ -134,8 +134,8 @@ function tokenizeTitle(title: string): Set<string> {
 }
 
 /**
- * Lightweight deterministic title similarity helper for future use.
- * Returns true if title token overlap exceeds the threshold.
+ * Lightweight deterministic title similarity helper for future standalone use.
+ * Does NOT block, delay, or alter existing automated publishing.
  */
 export function isDuplicateTitle(titleA: string, titleB: string, threshold = 0.7): boolean {
   if (!titleA || !titleB) return false;

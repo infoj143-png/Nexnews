@@ -42,7 +42,7 @@ test('extractSourceAttribution parses source name and URL safely from HTML conte
   assert.equal(noResult.sourceUrl, null);
 });
 
-test('getArticleTrustSignals provides AI transparency and qualitative badges without fake percentages', () => {
+test('getArticleTrustSignals treats URLs as source attribution and NEVER uses "Verified External Source"', () => {
   const aiArticle: Article = {
     id: '1',
     title: 'AI Outage Impacts Services',
@@ -66,11 +66,14 @@ test('getArticleTrustSignals provides AI transparency and qualitative badges wit
   assert.equal(signals.transparencyLabel, 'AI-generated from available news sources');
   assert.equal(signals.source.sourceName, 'Tech Source');
   assert.equal(signals.source.sourceUrl, 'https://example.com/news');
-  assert.ok(signals.qualitativeBadges.includes('Verified External Source'));
+
+  // Enforce correction: "External Source Link" is used instead of "Verified External Source"
+  assert.ok(signals.qualitativeBadges.includes('External Source Link'));
+  assert.equal(signals.qualitativeBadges.includes('Verified External Source'), false);
   assert.ok(signals.qualitativeBadges.includes('Automated Synthesis'));
   assert.ok(signals.qualitativeBadges.includes('Structured Analysis'));
 
-  // Ensure no numerical confidence score is present
+  // Ensure no numerical confidence score is generated
   const allBadgesText = signals.qualitativeBadges.join(' ');
   assert.equal(/\d+%/.test(allBadgesText), false);
   assert.equal(/confidence/i.test(allBadgesText), false);
@@ -102,9 +105,10 @@ test('getArticleTrustSignals handles non-AI editorial articles correctly', () =>
   assert.equal(signals.source.sourceName, null);
   assert.equal(signals.source.sourceUrl, null);
   assert.equal(signals.qualitativeBadges.includes('Automated Synthesis'), false);
+  assert.equal(signals.qualitativeBadges.includes('Verified External Source'), false);
 });
 
-test('isDuplicateTitle detects near-duplicate article titles deterministically', () => {
+test('isDuplicateTitle detects near-duplicate article titles deterministically as a standalone helper', () => {
   const title1 = 'ChatGPT Login Issues and Global AI System Outage';
   const title2 = 'ChatGPT Login Down: Global Outage Hits OpenAI and AI Systems';
   const title3 = 'NASA Launches New Deep Space Telescope to Explore Exoplanets';

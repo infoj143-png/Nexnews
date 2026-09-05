@@ -6,7 +6,6 @@ import { notFound } from 'next/navigation';
 import { getArticleBySlug, getArticles, getArticlesByCategory } from '@/lib/data';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { getSiteUrl } from '@/lib/site';
-import { extractSourceAttribution } from '@/lib/trust';
 
 export const dynamicParams = true;
 export const revalidate = 300;
@@ -118,9 +117,8 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
 
   const articleUrl = `${getSiteUrl()}/news/${article.slug}`;
   const faqs = extractFaqsFromContent(article.content);
-  const sourceInfo = extractSourceAttribution(article.content);
 
-  const newsArticleSchema: Record<string, unknown> = {
+  const newsArticleSchema = {
     '@context': 'https://schema.org',
     '@type': 'NewsArticle',
     'inLanguage': 'en-US',
@@ -149,14 +147,6 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
     'articleSection': article.category,
     'keywords': article.tags.join(', '),
   };
-
-  if (sourceInfo.sourceUrl) {
-    newsArticleSchema['isBasedOn'] = {
-      '@type': 'NewsArticle',
-      'name': sourceInfo.sourceName || 'Original Source',
-      'url': sourceInfo.sourceUrl,
-    };
-  }
 
   const breadcrumbSchema = {
     '@context': 'https://schema.org',
