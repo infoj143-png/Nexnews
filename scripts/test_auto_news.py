@@ -323,5 +323,53 @@ class TestKeywordExtractionAndRelevance(unittest.TestCase):
         stadium_meta = "Arun Jaitley Stadium during India vs Australia 2019 ODI.jpg"
         self.assertTrue(auto_news.is_image_relevant(stadium_meta, ["india", "australia"], "Sports"))
 
+class TestGeminiPromptLanguageMandate(unittest.TestCase):
+    @patch("urllib.request.urlopen")
+    def test_gemini_prompt_contains_english_language_mandate(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.status = 200
+        mock_response.read.return_value = json.dumps({
+            "candidates": [{
+                "content": {
+                    "parts": [{
+                        "text": json.dumps({
+                            "title": "English Test Title",
+                            "slug": "english-test-title",
+                            "category": "Tech",
+                            "summary": "This is a test summary in English.",
+                            "content": "<p class=\"mb-4\">Valid English article body content for testing.</p>",
+                            "tags": ["English", "Test"]
+                        })
+                    }]
+                }
+            }]
+        }).encode('utf-8')
+
+        ctx = MagicMock()
+        ctx.__enter__.return_value = mock_response
+        mock_urlopen.return_value = ctx
+
+        topic = {
+            "title": "Künstliche Intelligenz Revolution in Europa",
+            "trending_keyword": "Künstliche Intelligenz",
+            "headline": "Neues KI-Gesetz von der EU verabschiedet",
+            "source": "German Tech News",
+            "description": "Die Europäische Union hat neue Regeln für KI verabschiedet."
+        }
+
+        result = auto_news.generate_article_gemini(topic, "fake-key", ["gemini-2.5-flash"])
+
+        self.assertIsNotNone(result)
+
+        # Inspect request payload passed to urllib.request.Request
+        self.assertEqual(mock_urlopen.call_count, 1)
+        req = mock_urlopen.call_args[0][0]
+        payload = json.loads(req.data.decode('utf-8'))
+        prompt_text = payload["contents"][0]["parts"][0]["text"]
+
+        self.assertIn("LANGUAGE & TRANSLATION MANDATE", prompt_text)
+        self.assertIn("Strictly enforce output in standard English", prompt_text)
+        self.assertIn("automatically translate, synthesize, and write the full report entirely in English", prompt_text)
+
 if __name__ == "__main__":
     unittest.main()
