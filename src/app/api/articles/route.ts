@@ -1,23 +1,39 @@
 import { NextResponse } from 'next/server';
-import { getArticles, addArticle, deleteArticle, searchArticles, getAnalytics, isValidSlug, slugify } from '@/lib/data';
+import { getArticles, getAllArticles, addArticle, deleteArticle, getAnalytics, isValidSlug, slugify } from '@/lib/data';
 import { requireAdminAuth } from '@/lib/auth';
 
 export async function GET(request: Request) {
+  const auth = requireAdminAuth(request);
+  const isAdmin = auth.authenticated;
+
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q');
   const category = searchParams.get('category');
 
-  let articles = getArticles();
+  let articles = isAdmin ? getAllArticles() : getArticles();
 
   if (query) {
-    articles = searchArticles(query);
+    const q = query.toLowerCase();
+    articles = articles.filter(a =>
+      a.title.toLowerCase().includes(q) ||
+      a.summary.toLowerCase().includes(q) ||
+      a.tags.some(t => t.toLowerCase().includes(q))
+    );
   }
 
   if (category) {
     articles = articles.filter(a => a.category.toLowerCase() === category.toLowerCase());
   }
 
-  const analytics = getAnalytics();
+  const rawAnalytics = getAnalytics();
+  const analytics = isAdmin ? rawAnalytics : {
+    totalArticles: articles.length,
+    publishedCount: articles.length,
+    draftCount: 0,
+    aiGeneratedCount: articles.filter(a => a.aiGenerated).length,
+    manualCount: articles.filter(a => !a.aiGenerated).length,
+    categoryDistribution: rawAnalytics.categoryDistribution
+  };
 
   return NextResponse.json({
     success: true,

@@ -46,6 +46,7 @@ export default function robots(): MetadataRoute.Robots {
       `${baseUrl}/sitemap.xml`,
       `${baseUrl}/news-sitemap.xml`,
       `${baseUrl}/feed.xml`,
+      `${baseUrl}/rss.xml`,
     ],
   };
 }

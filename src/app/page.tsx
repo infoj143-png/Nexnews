@@ -61,8 +61,8 @@ export default async function HomePage() {
               <Link href={`/news/${heroArticle.slug}`} className="block relative overflow-hidden rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
                 <div className="relative h-72 sm:h-96 w-full overflow-hidden">
                   <Image
-                    src={heroArticle.imageUrl}
-                    alt={heroArticle.title}
+                    src={heroArticle.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80'}
+                    alt={heroArticle.title || 'Featured Article Coverage'}
                     fill
                     priority
                     sizes="(max-width: 1024px) 100vw, 66vw"

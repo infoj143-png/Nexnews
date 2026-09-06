@@ -2,6 +2,7 @@ import assert from 'node:assert';
 import { test } from 'node:test';
 import bcrypt from 'bcryptjs';
 import { POST as loginHandler } from '../app/api/admin/login/route';
+import { GET as getArticlesHandler } from '../app/api/articles/route';
 import { signAdminToken } from './auth';
 
 function setNodeEnv(value: string | undefined) {
@@ -128,4 +129,18 @@ test('Admin login accepts valid bcrypt hashed password in production mode', asyn
     if (origSecret !== undefined) process.env.ADMIN_SESSION_SECRET = origSecret;
     else delete process.env.ADMIN_SESSION_SECRET;
   }
+});
+
+test('Public GET /api/articles strictly returns only published articles', async () => {
+  const req = new Request('http://localhost:3000/api/articles', {
+    method: 'GET'
+  });
+
+  const res = await getArticlesHandler(req);
+  assert.strictEqual(res.status, 200);
+  const json = await res.json();
+  assert.strictEqual(json.success, true);
+  assert.ok(Array.isArray(json.articles));
+  assert.ok(json.articles.every((a: { status: string }) => a.status === 'published'));
+  assert.strictEqual(json.analytics.draftCount, 0);
 });
