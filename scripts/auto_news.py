@@ -21,7 +21,6 @@ import xml.etree.ElementTree as ET
 import html
 
 from google.oauth2 import service_account
-from google.auth.transport.requests import AuthorizedSession
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
@@ -793,11 +792,24 @@ BREAKING HEADLINE / CONTEXT: "{headline}"
 SOURCE DISPATCH: "{topic.get('source', 'Nexnews Trend Radar')}"
 SUMMARY CONTEXT: "{topic.get('description', '')}"
 
+### FACTUALITY & ACCURACY GUARDRAILS:
+- Strictly DO NOT hallucinate, fake, or invent numbers, statistics, figures, or quotes not provided or directly supported in the source context.
+- If specific numerical figures or direct quotes are absent from the context, focus on factual, descriptive narrative reporting without creating arbitrary metrics.
+
+### CONTENT DIVERSITY & STRUCTURE:
+- Vary article structure, section flow, and phrasing to eliminate template repetition across articles.
+- Avoid repetitive introductory clichés (e.g., "In a surprising turn of events", "In today's fast-paced world") or identical sub-heading patterns.
+
+### DYNAMIC FLAGGING MANDATES:
+- Evaluate whether this topic represents a genuine major emergency, active crisis, or major breaking event.
+- Set `isBreaking` to `false` by default; set to `true` ONLY if the source context explicitly represents major emergency/breaking news.
+- Set `isTrending` to `false` by default; set to `true` ONLY if the source context explicitly represents a major widespread trending event.
+
 ### SEARCH INTENT & SEO / GEO OPTIMIZATION MANDATES:
 1. Search Keyword Targeting: The main title and opening paragraph must seamlessly integrate the high-demand keyword "{trending_kw}" to capture maximum organic search traffic.
 2. User Intent Resolution: Resolve the user's search query immediately in the lead paragraph by addressing what happened, key developments, and real-world implications.
 3. Structural Hierarchy: Use clear <h2> and <h3> HTML tags for clean scanning and search engine indexing.
-4. Key Takeaways & Metrics: Include a bulleted <ul> list with concrete statistics, quantitative metrics, or key event timeline points.
+4. Key Takeaways & Fact Points: Include a bulleted <ul> list with key factual bullet points or verified timeline details from the source context.
 5. High-Intent FAQ Section: Include a "Key Questions Answered" or FAQ section using <h3> headings that answer long-tail search questions users ask about "{trending_kw}".
 6. Category Classification: Classify the article into exactly one of these categories: "Tech", "World", "Business", "AI", "Sports" based on the headline/content.
 7. HTML Formatting Standards: Wrap paragraphs in <p class="mb-4">, main sections in <h2 class="text-2xl font-bold mt-6 mb-3">, sub-headings in <h3 class="text-xl font-semibold mt-4 mb-2">, lists in <ul class="list-disc pl-6 my-4 space-y-2">, and blockquotes in <blockquote class="border-l-4 border-blue-600 pl-4 my-6 italic text-slate-700 dark:text-slate-300 font-serif">.
@@ -809,7 +821,9 @@ Return ONLY a valid JSON object matching this schema:
   "category": "Tech" | "World" | "Business" | "AI" | "Sports",
   "summary": "1-2 sentence search snippet optimized executive summary",
   "content": "Complete article HTML string containing h2, h3, p, ul, blockquote, direct search query resolutions",
-  "tags": ["Tag1", "Tag2", "Tag3", "Tag4"]
+  "tags": ["Tag1", "Tag2", "Tag3", "Tag4"],
+  "isBreaking": false,
+  "isTrending": false
 }}
 """
 
@@ -874,9 +888,14 @@ HEADLINE: "{headline}"
 SOURCE: "{source}"
 DESCRIPTION: "{desc}"
 
+### FACTUALITY & ACCURACY GUARDRAILS:
+- Strictly DO NOT hallucinate, fake, or invent numbers, statistics, figures, or quotes not supported by context.
+- Vary article structure and language to avoid template repetition across articles.
+- Set `isBreaking` to `false` and `isTrending` to `false` by default unless context explicitly represents major breaking news.
+
 Optimize title and content to resolve user search intent for "{trending_kw}".
 Classify category as one of: Tech, World, Business, AI, Sports.
-Include h2, h3 FAQ sections, p, ul with stats, and blockquotes.
+Include h2, h3 FAQ sections, p, ul, and blockquotes.
 
 Return ONLY a valid JSON object:
 {{
@@ -885,7 +904,9 @@ Return ONLY a valid JSON object:
   "category": "Tech" | "World" | "Business" | "AI" | "Sports",
   "summary": "1-2 sentence summary",
   "content": "HTML article content with h2, h3, p, ul, blockquote",
-  "tags": ["Tag1", "Tag2", "Tag3"]
+  "tags": ["Tag1", "Tag2", "Tag3"],
+  "isBreaking": false,
+  "isTrending": false
 }}
 """
 
@@ -1034,6 +1055,9 @@ def main():
         category=cat
     )
 
+    is_breaking = bool(generated_article_data.get("isBreaking", False))
+    is_trending = bool(generated_article_data.get("isTrending", False))
+
     full_article = {
         "id": article_id,
         "title": title,
@@ -1047,12 +1071,14 @@ def main():
             "role": "Editorial Desk"
         },
         "publishedAt": published_at,
+        "datePublished": published_at,
+        "dateModified": published_at,
         "readTime": "4 min read",
         "imageUrl": image_url,
         "imageCaption": image_caption,
         "isFeatured": True,
-        "isTrending": True,
-        "isBreaking": True,
+        "isTrending": is_trending,
+        "isBreaking": is_breaking,
         "views": 0,
         "status": "published",
         "tags": tags,
@@ -1074,11 +1100,6 @@ def main():
 
     # Backup newly published article JSON to Google Drive
     backup_to_google_drive(file_path)
-
-    # Automatically submit newly published article to Google Indexing API
-    site_url = os.environ.get("SITE_URL", "https://nexnews-nu.vercel.app").rstrip("/")
-    article_url = f"{site_url}/news/{slug}"
-    submit_to_google_indexing(article_url)
 
 def backup_to_google_drive(file_path: str) -> bool:
     """
@@ -1136,49 +1157,6 @@ def backup_to_google_drive(file_path: str) -> bool:
         return True
     except Exception as e:
         print(f"[-] Error uploading '{file_path}' to Google Drive: {e}")
-        return False
-
-def submit_to_google_indexing(article_url: str) -> bool:
-    """
-    Retrieves service account JSON credentials from GCP_SA_KEY,
-    authenticates using Google Indexing API scope, and submits a POST request to publish the URL.
-    """
-    gcp_sa_key = os.environ.get("GCP_SA_KEY")
-    if not gcp_sa_key:
-        print("[-] GCP_SA_KEY environment variable is not set. Skipping Google Indexing API submission.")
-        return False
-
-    scopes = ["https://www.googleapis.com/auth/indexing"]
-    endpoint = "https://indexing.googleapis.com/v3/urlNotifications:publish"
-
-    try:
-        if os.path.isfile(gcp_sa_key):
-            credentials = service_account.Credentials.from_service_account_file(
-                gcp_sa_key, scopes=scopes
-            )
-        else:
-            sa_info = json.loads(gcp_sa_key)
-            credentials = service_account.Credentials.from_service_account_info(
-                sa_info, scopes=scopes
-            )
-
-        session = AuthorizedSession(credentials)
-        payload = {
-            "url": article_url,
-            "type": "URL_UPDATED"
-        }
-        response = session.post(endpoint, json=payload, timeout=15)
-
-        if response.status_code == 200:
-            print(f"[SUCCESS] Successfully submitted '{article_url}' to Google Indexing API.")
-            print(f" - Response: {response.text}")
-            return True
-        else:
-            print(f"[-] Failed to submit '{article_url}' to Google Indexing API. Status code: {response.status_code}")
-            print(f" - Response: {response.text}")
-            return False
-    except Exception as e:
-        print(f"[-] Error submitting '{article_url}' to Google Indexing API: {e}")
         return False
 
 if __name__ == "__main__":
