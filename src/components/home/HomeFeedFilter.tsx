@@ -61,9 +61,10 @@ export function HomeFeedFilter({ articles }: HomeFeedFilterProps) {
             <article className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 hover:border-blue-500/40 transition-all shadow-xs flex flex-col sm:flex-row gap-4 sm:gap-6">
               <div className="sm:w-48 h-40 sm:h-32 shrink-0 rounded-xl overflow-hidden relative bg-slate-100 dark:bg-slate-800">
                 <Image
-                  src={article.imageUrl}
-                  alt={article.title}
+                  src={article.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80'}
+                  alt={article.title || 'Article thumbnail'}
                   fill
+                  loading="lazy"
                   sizes="(max-width: 640px) 100vw, 192px"
                   className="object-cover group-hover:scale-105 transition-transform duration-300"
                 />

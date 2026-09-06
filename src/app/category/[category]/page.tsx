@@ -127,9 +127,10 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                 <article className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 hover:border-blue-500/40 transition-all shadow-xs flex flex-col sm:flex-row gap-6">
                   <div className="sm:w-52 h-44 sm:h-36 shrink-0 rounded-xl overflow-hidden relative bg-slate-100 dark:bg-slate-800">
                     <Image
-                      src={article.imageUrl}
-                      alt={article.title}
+                      src={article.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80'}
+                      alt={article.title || 'Category Story Thumbnail'}
                       fill
+                      loading="lazy"
                       sizes="(max-width: 640px) 100vw, 208px"
                       className="object-cover group-hover:scale-105 transition-transform duration-300"
                     />

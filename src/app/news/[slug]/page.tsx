@@ -268,11 +268,11 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
             <div className="flex items-center justify-between p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
               <div className="flex items-center gap-3">
                 <Image
-                  src={article.author.avatar}
-                  alt={article.author.name}
+                  src={article.author.avatar || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&q=80'}
+                  alt={article.author.name || 'Article Author'}
                   width={44}
                   height={44}
-                  className="w-11 h-11 rounded-full object-cover border-2 border-blue-500"
+                  className="w-11 h-11 rounded-full object-cover border-2 border-blue-500 shrink-0"
                 />
                 <div>
                   <h4 className="text-sm font-bold text-slate-900 dark:text-white">{article.author.name}</h4>
@@ -305,8 +305,8 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
           <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-900 shadow-sm">
             <div className="relative w-full aspect-video max-h-[460px]">
               <Image
-                src={article.imageUrl}
-                alt={article.title}
+                src={article.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80'}
+                alt={article.title || 'Article Main Visual'}
                 fill
                 priority
                 sizes="(max-width: 1024px) 100vw, 800px"
@@ -377,9 +377,10 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
                   >
                     <div className="w-24 h-20 shrink-0 rounded-lg overflow-hidden relative bg-slate-100 dark:bg-slate-800">
                       <Image
-                        src={rel.imageUrl}
-                        alt={rel.title}
+                        src={rel.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80'}
+                        alt={rel.title || 'Related Story Thumbnail'}
                         fill
+                        loading="lazy"
                         sizes="96px"
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                       />

@@ -132,7 +132,7 @@ export function getAllArticles(): Article[] {
 }
 
 export function getArticles(): Article[] {
-  return getAllArticles();
+  return getAllArticles().filter(a => a.status === 'published');
 }
 
 export function getArticleBySlug(slug: string): Article | undefined {
@@ -140,7 +140,7 @@ export function getArticleBySlug(slug: string): Article | undefined {
 }
 
 export function getArticlesByCategory(category: Category): Article[] {
-  return getArticles().filter(a => a.category.toLowerCase() === category.toLowerCase() && a.status === 'published');
+  return getArticles().filter(a => a.category.toLowerCase() === category.toLowerCase());
 }
 
 export function searchArticles(query: string): Article[] {
@@ -289,7 +289,7 @@ export function slugify(text: string): string {
 }
 
 export function getAnalytics(): AnalyticsData {
-  const articles = getArticles();
+  const articles = getAllArticles();
   const totalArticles = articles.length;
   const publishedCount = articles.filter(a => a.status === 'published').length;
   const draftCount = articles.filter(a => a.status === 'draft').length;
