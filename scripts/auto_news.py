@@ -792,6 +792,10 @@ BREAKING HEADLINE / CONTEXT: "{headline}"
 SOURCE DISPATCH: "{topic.get('source', 'Nexnews Trend Radar')}"
 SUMMARY CONTEXT: "{topic.get('description', '')}"
 
+### LANGUAGE & TRANSLATION MANDATE:
+- Strictly enforce output in standard English. All generated fields (title, summary, article content, tags, key takeaways, and FAQs) MUST be written completely in clear, professional journalistic English.
+- If the source material, search query, headline, or context is in German, French, Spanish, Chinese, or any other non-English language, you MUST automatically translate, synthesize, and write the full report entirely in English.
+
 ### FACTUALITY & ACCURACY GUARDRAILS:
 - Strictly DO NOT hallucinate, fake, or invent numbers, statistics, figures, or quotes not provided or directly supported in the source context.
 - If specific numerical figures or direct quotes are absent from the context, focus on factual, descriptive narrative reporting without creating arbitrary metrics.
