@@ -60,9 +60,56 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   const articles = getArticles();
+  const siteUrl = getSiteUrl();
+
+  const organizationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'NewsMediaOrganization',
+    '@id': `${siteUrl}/#organization`,
+    'name': 'Nexnews',
+    'url': siteUrl,
+    'logo': {
+      '@type': 'ImageObject',
+      'url': `${siteUrl}/logo.png`,
+      'width': 512,
+      'height': 512,
+    },
+    'sameAs': [
+      'https://twitter.com/nexnews',
+    ],
+    'publishingPrinciples': `${siteUrl}/editorial-policy`,
+    'correctionsPolicy': `${siteUrl}/corrections-policy`,
+    'contactPoint': {
+      '@type': 'ContactPoint',
+      'email': 'editor@nexnews.app',
+      'contactType': 'editorial desk',
+    },
+  };
+
+  const webSiteSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': `${siteUrl}/#website`,
+    'url': siteUrl,
+    'name': 'Nexnews',
+    'description': 'AI-Powered Automated News Portal delivering real-time breaking coverage.',
+    'publisher': {
+      '@id': `${siteUrl}/#organization`,
+    },
+  };
 
   return (
     <html lang="en" className="h-full">
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteSchema) }}
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
         {/* Monetag Global Tag Script */}
         <Script

@@ -1,7 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
 import { CATEGORIES } from '@/lib/data';
-import { Rss, Globe } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
@@ -40,21 +39,29 @@ export const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Platform Info */}
+          {/* Platform Info & Policy */}
           <div>
-            <h4 className="text-white font-bold text-sm tracking-wider uppercase mb-4">Platform</h4>
+            <h4 className="text-white font-bold text-sm tracking-wider uppercase mb-4">Trust & Policies</h4>
             <ul className="space-y-2 text-sm text-slate-400">
               <li>
-                <span className="hover:text-slate-300 transition-colors flex items-center gap-1.5">
-                  <Rss className="w-3.5 h-3.5 text-amber-500" />
-                  <span>Automated RSS Sync</span>
-                </span>
+                <Link href="/about" className="hover:text-blue-400 transition-colors block py-0.5">
+                  About Us
+                </Link>
               </li>
               <li>
-                <span className="hover:text-slate-300 transition-colors flex items-center gap-1.5">
-                  <Globe className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Global Coverage</span>
-                </span>
+                <Link href="/contact" className="hover:text-blue-400 transition-colors block py-0.5">
+                  Contact & Editorial Team
+                </Link>
+              </li>
+              <li>
+                <Link href="/editorial-policy" className="hover:text-blue-400 transition-colors block py-0.5">
+                  Editorial & AI Standards
+                </Link>
+              </li>
+              <li>
+                <Link href="/corrections-policy" className="hover:text-blue-400 transition-colors block py-0.5">
+                  Corrections Policy
+                </Link>
               </li>
             </ul>
           </div>
@@ -75,10 +82,16 @@ export const Footer: React.FC = () => {
         {/* Bottom Bar */}
         <div className="mt-12 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
           <p>© {new Date().getFullYear()} Nexnews Inc. Powered by Next.js & Nexnews Engine.</p>
-          <div className="flex gap-6">
-            <span className="hover:text-slate-400 cursor-pointer">Privacy Policy</span>
-            <span className="hover:text-slate-400 cursor-pointer">Terms of Service</span>
-            <span className="hover:text-slate-400 cursor-pointer">Ad Specs</span>
+          <div className="flex gap-6 flex-wrap">
+            <Link href="/privacy" className="hover:text-slate-400 transition-colors">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:text-slate-400 transition-colors">
+              Terms of Service
+            </Link>
+            <Link href="/editorial-policy" className="hover:text-slate-400 transition-colors">
+              Editorial Standards
+            </Link>
           </div>
         </div>
       </div>
