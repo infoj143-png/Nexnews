@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
 import { notFound } from 'next/navigation';
-import { getArticleBySlug, getArticles, getArticlesByCategory } from '@/lib/data';
+import { getArticleBySlug, getArticles, Article } from '@/lib/data';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { getSiteUrl } from '@/lib/site';
 
@@ -14,7 +14,7 @@ import { TrendingSidebar } from '@/components/widgets/TrendingSidebar';
 import { NewsletterWidget } from '@/components/widgets/NewsletterWidget';
 import { ArticleActions } from '@/components/article/ArticleActions';
 import { ArticleTrustBadge } from '@/components/article/ArticleTrustBadge';
-import { Clock, Eye, ChevronLeft, Calendar, Tag } from 'lucide-react';
+import { Clock, Eye, ChevronLeft, Calendar, Tag, Layers, ArrowRight } from 'lucide-react';
 
 interface ArticlePageProps {
   params: Promise<{
@@ -103,6 +103,33 @@ function extractFaqsFromContent(htmlContent: string): Array<{ question: string; 
   return faqs;
 }
 
+/**
+ * Returns 3 to 5 related articles prioritized by tag/topic overlaps,
+ * falling back to category matches to ensure a solid internal linking cluster.
+ */
+function getRelatedTopicArticles(currentArticle: Article, limit = 4): Article[] {
+  const allOtherArticles = getArticles().filter(
+    (a) => a.id !== currentArticle.id && a.status === 'published'
+  );
+
+  const currentTags = new Set(currentArticle.tags.map((t) => t.toLowerCase()));
+
+  const scored = allOtherArticles.map((art) => {
+    let score = 0;
+    if (art.category.toLowerCase() === currentArticle.category.toLowerCase()) {
+      score += 5;
+    }
+    const matchingTags = art.tags.filter((t) => currentTags.has(t.toLowerCase())).length;
+    score += matchingTags * 3;
+
+    return { article: art, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score || new Date(b.article.publishedAt).getTime() - new Date(a.article.publishedAt).getTime());
+
+  return scored.slice(0, limit).map((item) => item.article);
+}
+
 export default async function ArticleDetailPage({ params }: ArticlePageProps) {
   const resolvedParams = await params;
   const article = getArticleBySlug(resolvedParams.slug);
@@ -111,9 +138,7 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
     notFound();
   }
 
-  const relatedArticles = getArticlesByCategory(article.category)
-    .filter(a => a.id !== article.id)
-    .slice(0, 3);
+  const relatedArticles = getRelatedTopicArticles(article, 4);
 
   const articleUrl = `${getSiteUrl()}/news/${article.slug}`;
   const faqs = extractFaqsFromContent(article.content);
@@ -223,9 +248,12 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
           {/* Article Header */}
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-blue-600 text-white">
+              <Link
+                href={`/category/${article.category.toLowerCase()}`}
+                className="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+              >
                 {article.category}
-              </span>
+              </Link>
             </div>
 
             <h1 className="text-2xl sm:text-4xl font-black font-serif text-slate-900 dark:text-white leading-tight">
@@ -322,32 +350,49 @@ export default async function ArticleDetailPage({ params }: ArticlePageProps) {
           {/* Interactive Share & Comments */}
           <ArticleActions title={article.title} summary={article.summary} slug={article.slug} />
 
-          {/* Related Articles Carousel/Grid */}
+          {/* Topic Cluster & Related Internal Links */}
           {relatedArticles.length > 0 && (
-            <div className="pt-8 border-t border-slate-200 dark:border-slate-800 space-y-4">
-              <h3 className="text-xl font-bold font-serif text-slate-900 dark:text-white">
-                More in {article.category}
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {relatedArticles.map(rel => (
+            <div className="pt-8 border-t border-slate-200 dark:border-slate-800 space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-blue-600" />
+                  <h3 className="text-xl font-bold font-serif text-slate-900 dark:text-white">
+                    Topic Cluster: More Coverage in {article.category}
+                  </h3>
+                </div>
+                <Link
+                  href={`/category/${article.category.toLowerCase()}`}
+                  className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1"
+                >
+                  View All <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {relatedArticles.map((rel) => (
                   <Link
                     key={rel.id}
                     href={`/news/${rel.slug}`}
-                    className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 hover:border-blue-500/40 transition-all flex flex-col justify-between"
+                    className="group bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 hover:border-blue-500/40 transition-all flex gap-3 items-center"
                   >
-                    <div className="h-28 rounded-lg overflow-hidden mb-2 relative">
+                    <div className="w-24 h-20 shrink-0 rounded-lg overflow-hidden relative bg-slate-100 dark:bg-slate-800">
                       <Image
                         src={rel.imageUrl}
                         alt={rel.title}
                         fill
-                        sizes="(max-width: 640px) 100vw, 250px"
+                        sizes="96px"
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                     </div>
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-500 line-clamp-2 leading-snug">
-                      {rel.title}
-                    </h4>
-                    <span className="text-[10px] text-slate-400 mt-2 block">{rel.readTime}</span>
+                    <div className="flex-1 space-y-1">
+                      <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400">
+                        {rel.category}
+                      </span>
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-blue-500 line-clamp-2 leading-snug">
+                        {rel.title}
+                      </h4>
+                      <span className="text-[10px] text-slate-400 block">{rel.readTime}</span>
+                    </div>
                   </Link>
                 ))}
               </div>
